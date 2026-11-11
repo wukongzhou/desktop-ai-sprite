@@ -1,0 +1,16 @@
+.env
+.env.*
+!.env.example
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+model-cache/
+ollama-models/
+saved_sprites/
+uploads/
+*.log
+.DS_Store
+Thumbs.db
+assets/sample_dev.jpg
+
