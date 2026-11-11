@@ -1,0 +1,11 @@
+.env
+.venv
+venv
+__pycache__
+*.py[cod]
+model-cache
+ollama-models
+saved_sprites
+uploads
+.git
+
