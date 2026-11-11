@@ -1,0 +1,1857 @@
+Warning: truncated output (original token count: 30299)
+Total output lines: 1886
+
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>抽象桌面精灵工坊 · Cartoon Sprite Studio</title>
+  <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: #f5efe6;
+      color: #2b2522;
+      font-family: 'Inter', 'Noto Sans SC', 'Microsoft YaHei', system-ui, sans-serif;
+      overflow-x: hidden;
+    }
+    .checkerboard {
+      background-color: #ebe3d8;
+      background-image:
+        linear-gradient(45deg, #dfd5c7 25%, transparent 25%),
+        linear-gradient(-45deg, #dfd5c7 25%, transparent 25%),
+        linear-gradient(45deg, transparent 75%, #dfd5c7 75%),
+        linear-gradient(-45deg, transparent 75%, #dfd5c7 75%);
+      background-size: 20px 20px;
+      background-position: 0 0, 0 10px, 10px -10px, -10px 0;
+    }
+    .desktop-wallpaper {
+      background: radial-gradient(circle at 20% 20%, #3b4269 0%, #1e2238 52%, #121524 100%);
+    }
+    input[type="range"] {
+      accent-color: #d8653c;
+    }
+    .anchor-dot {
+      width: 24px;
+      height: 24px;
+      border-radius: 9999px;
+      border: 2.5px solid #fff;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.35);
+      transform: translate(-50%, -50%);
+      cursor: grab;
+      user-select: none;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      font-weight: 800;
+      color: #fff;
+      transition: transform 0.1s ease;
+    }
+    .anchor-dot:active {
+      cursor: grabbing;
+      transform: translate(-50%, -50%) scale(1.18);
+    }
+    .style-card.active {
+      border-color: #d8653c;
+      background-color: #fff5ee;
+      box-shadow: 0 6px 20px -4px rgba(216, 101, 60, 0.22);
+    }
+    .state-btn.active {
+      background-color: #2b2522;
+      color: #ffffff;
+    }
+    .view-tab.active { background-color: #d8653c; color: #ffffff; }
+    .pet-action { border-radius: .65rem; padding: .35rem .65rem; font-size: 11px; font-weight: 700; color: #fff; background: rgba(255,255,255,.12); }
+    .pet-action:hover,.pet-action.active { background: #d8653c; }
+    #legacyFilterControls { display:none !important; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col">
+
+  <!-- Top Navigation Bar -->
+  <header class="sticky top-0 z-30 bg-[#f5efe6]/90 backdrop-blur-md border-b border-[#e5dacb] px-4 sm:px-6 py-3">
+    <div class="max-w-7xl mx-auto flex flex-wrap items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="w-10 h-10 rounded-2xl bg-[#d8653c] text-white flex items-center justify-center text-xl shadow-sm">
+          🎭
+        </div>
+        <div>
+          <div class="flex items-center gap-2">
+            <span class="font-black text-lg tracking-tight text-[#2b2522]">抽象桌面精灵工坊</span>
+            <span class="text-xs font-semibold px-2 py-0.5 rounded-full bg-[#e9dccd] text-[#6d5d53]">Sprite Studio v2.0</span>
+          </div>
+          <p class="text-xs text-[#786c63] hidden sm:block">上传一张图 → 自动提取主体 → 非线性放大五官/神态特点 → 生成多状态透明桌面精灵</p>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 flex-wrap">
+        <label class="inline-flex items-center gap-2 text-xs font-semibold text-[#544840]" for="languageSelect"><span>🌐</span><select id="languageSelect" class="rounded-lg border border-[#d9cbbb] bg-white px-2 py-1.5" aria-label="Interface language"></select></label>
+        <div id="backendBadge" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-[#ece2d6] text-[#5c5048]">
+          <span id="backendDot" class="w-2 h-2 rounded-full bg-amber-500"></span>
+          <span id="backendText">引擎：实时抽象特征内核（双击 start-windows.bat 可连本机服务）</span>
+        </div>
+        <button id="btnSummonPet" type="button" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#2b2522] hover:bg-[#413834] text-white transition shadow-sm">
+          <span>🚀 召唤到本机桌面</span>
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- Hidden Sample Images (Inlined as Base64 for instant offline/Canvas use) -->
+  <div class="hidden" aria-hidden="true">
+
+    <img id="presetImgCat" src="" alt="领结喵星人">
+    <img id="presetImgArtist" src="" alt="贝雷帽画师">
+  </div>
+
+  <!-- Main Workspace -->
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+    <!-- Left Column: Upload, Focal Anchors & Feature Magnification Controls (5 cols) -->
+    <section class="lg:col-span-5 flex flex-col gap-5">
+
+      <!-- Card 1: Image Source & Interactive Feature Anchors -->
+      <div class="bg-white rounded-3xl p-5 shadow-sm border border-[#eadfd2]">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-extrabold text-base flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-[#fff0e8] text-[#d8653c] inline-flex items-center justify-center text-xs font-black">1</span>
+            <span>上传原图 & 焦点特征锚点</span>
+          </h2>
+          <button id="btnAutoFocus" type="button" class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#f5efe6] hover:bg-[#eadfd2] text-[#544840] transition">
+            🎯 自动定位特点
+          </button>
+        </div>
+
+        <!-- Preset Avatars Bar -->
+        <div class="flex items-center gap-2 mb-3 overflow-x-auto pb-1">
+          <span class="text-xs font-semibold text-[#7c7067] shrink-0">示例一键试玩：</span>
+<button type="button" data-preset="cat" class="preset-btn shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-[#f7f2ec] border border-transparent hover:border-[#d5c6b6] text-[#4c423b] transition">
+            <span>🐱</span><span>领结傲娇喵</span>
+          </button>
+          <button type="button" data-preset="artist" class="preset-btn shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-[#f7f2ec] border border-transparent hover:border-[#d5c6b6] text-[#4c423b] transition">
+            <span>🎨</span><span>贝雷帽卷发</span>
+          </button>
+        </div>
+
+        <!-- Source Preview + Draggable Focal Points + Upload Dropzone -->
+        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+          <div class="sm:col-span-6 relative rounded-2xl overflow-hidden bg-[#f3ede4] border border-[#e3d6c7] aspect-square select-none" id="anchorStage">
+            <canvas id="sourceCanvas" width="320" height="320" class="w-full h-full object-cover block"></canvas>
+            <!-- Draggable Focal Anchors -->
+            <div id="anchorLeftEye" class="anchor-dot bg-[#e0533c]" style="left: 37%; top: 41%;" title="左眼/左镜框放大中心（可拖动）">L</div>
+            <div id="anchorRightEye" class="anchor-dot bg-[#e0533c]" style="left: 63%; top: 41%;" title="右眼/右镜框放大中心（可拖动）">R</div>
+            <div id="anchorMouth" class="anchor-dot bg-[#2f7d6d]" style="left: 50%; top: 61%;" title="嘴巴/表情张力中心（可拖动）">M</div>
+            <div id="anchorAccessory" class="anchor-dot bg-[#d98a2b]" style="left: 50%; top: 24%;" title="头顶/发饰/耳朵特点放大中心（可拖动）">★</div>
+            <div class="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 backdrop-blur-sm text-white text-[11px] px-2 py-1 rounded-lg flex items-center justify-between pointer-events-none">
+              <span>拖动圆点可指定要放大的特点部位</span>
+              <span id="toggleAnchorsHint" class="opacity-80">L/R眼 · M嘴 · ★配饰</span>
+            </div>
+          </div>
+
+          <div class="sm:col-span-6 flex flex-col gap-2.5">
+            <label for="fileInput" id="dropZone" class="cursor-pointer border-2 border-dashed border-[#d5c5b4] hover:border-[#d8653c] bg-[#faf6f0] rounded-2xl p-4 text-center transition flex flex-col items-center justify-center min-h-[132px]">
+              <span class="text-2xl mb-1">📤</span>
+              <span class="text-xs font-bold text-[#3a312c]">点击上传你的照片 / 拖拽图片</span>
+              <span class="text-[11px] text-[#85786e] mt-0.5">支持人像、萌宠、二次元或任意物体</span>
+              <input id="fileInput" type="file" accept="image/*" class="hidden">
+            </label>
+
+            <div class="bg-[#faf6f0] rounded-2xl p-3 border border-[#ede3d7]">
+              <div class="flex items-center justify-between text-xs font-bold text-[#4a3f39] mb-1">
+                <span>🔍 识别到的显著视觉特点</span>
+                <label class="inline-flex items-center gap-1 cursor-pointer font-medium text-[11px] text-[#786c63]">
+                  <input id="chkShowAnchors" type="checkbox" checked class="rounded text-[#d8653c]">
+                  <span>显示锚点</span>
+                </label>
+              </div>
+              <div id="traitTags" class="flex flex-wrap gap-1.5 mt-1.5">
+                <!-- Populated dynamically -->
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Card 2: Abstract Style Direction -->
+      <div class="bg-white rounded-3xl p-5 shadow-sm border border-[#eadfd2]">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-extrabold text-base flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-[#fff0e8] text-[#d8653c] inline-flex items-center justify-center text-xs font-black">2</span>
+            <span>抽象精灵风格流派</span>
+          </h2>
+          <button id="btnRandomQuirk" type="button" class="text-xs font-semibold px-2.5 py-1 rounded-lg bg-[#fff0e8] hover:bg-[#ffe2d1] text-[#c8562e] transition">
+            🎲 随机灵魂暴走
+          </button>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5" id="styleGrid">
+          <button type="button" data-style="big" class="style-card active text-left p-3 rounded-2xl border-2 border-[#eee4db] transition">
+            <div class="text-xl mb-0.5">😆</div>
+            <div class="font-bold text-xs text-[#2b2522]">夸张大头萌系</div>
+            <div class="text-[11px] text-[#7d7067] leading-tight mt-0.5">Q版大头 + 闪亮大眼 + 饱满色块</div>
+          </button>
+          <button type="button" data-style="weird" class="style-card text-left p-3 rounded-2xl border-2 border-[#eee4db] transition">
+            <div class="text-xl mb-0.5">🤪</div>
+            <div class="font-bold text-xs text-[#2b2522]">怪诞超现实</div>
+            <div class="text-[11px] text-[#7d7067] leading-tight mt-0.5">大小眼不对称 + 戏剧感扭曲神态</div>
+          </button>
+          <button type="button" data-style="geo" class="style-card text-left p-3 rounded-2xl border-2 border-[#eee4db] transition">
+            <div class="text-xl mb-0.5">🔶</div>
+            <div class="font-bold text-xs text-[#2b2522]">几何立体抽象</div>
+            <div class="text-[11px] text-[#7d7067] leading-tight mt-0.5">毕加索式切面 + 撞色几何拼贴</div>
+          </button>
+          <button type="button" data-style="grumpy" class="style-card text-left p-3 rounded-2xl border-2 border-[#eee4db] transition">
+            <div class="text-xl mb-0.5">😤</div>
+            <div class="font-bold text-xs text-[#2b2522]">俏皮讽刺漫画像</div>
+            <div class="text-[11px] text-[#7d7067] leading-tight mt-0.5">粗犷手绘墨线 + 傲娇嘴角强化</div>
+          </button>
+          <button type="button" data-style="pop" class="style-card text-left p-3 rounded-2xl border-2 border-[#eee4db] transition">
+            <div class="text-xl mb-0.5">⚡</div>
+            <div class="font-bold text-xs text-[#2b2522]">潮流波普贴纸</div>
+            <div class="text-[11px] text-[#7d7067] leading-tight mt-0.5">高反差撞色 + 漫画网点 + 霓虹光晕</div>
+          </button>
+          <button type="button" data-style="pixel" class="style-card text-left p-3 rounded-2xl border-2 border-[#eee4db] transition">
+            <div class="text-xl mb-0.5">👾</div>
+            <div class="font-bold text-xs text-[#2b2522]">复古像素桌宠</div>
+            <div class="text-[11px] text-[#7d7067] leading-tight mt-0.5">16-Bit 像素颗粒 + 街机精灵质感</div>
+          </button>
+        </div>
+        <p class="mt-2 text-[11px] text-[#7d7067]">点击任一流派会立即调用图片 AI 按所选风格重新生成，并消耗该模型的额度。</p>
+      </div>
+
+      <!-- AI generation controls card -->
+      <div class="bg-white rounded-3xl p-5 shadow-sm border border-[#eadfd2]">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="font-extrabold text-base flex items-center gap-2">
+            <span class="w-6 h-6 rounded-lg bg-[#fff0e8] text-[#d8653c] inline-flex items-center justify-center text-xs font-black">3</span>
+            <span>AI 萌宠生成</span>
+          </h2>
+        </div>
+
+        <div id="legacyFilterControls" class="space-y-3.5 text-xs">
+          <!-- Slider 1: Head & Chibi Ratio -->
+          <div>
+            <div class="flex justify-between font-semibold mb-1">
+              <span>🎈 头部/主体膨胀比 (Chibi Head Scale)</span>
+              <span id="valHeadScale" class="text-[#d8653c] font-bold">1.45x</span>
+            </div>
+            <input id="rngHeadScale" type="range" min="1.0" max="1.95" step="0.05" value="1.45" class="w-full h-1.5 bg-[#e9dfd3] rounded-lg cursor-pointer">
+          </div>
+
+          <!-- Slider 2: Eyes & Glasses Magnification -->
+          <div>
+            <div class="flex justify-between font-semibold mb-1">
+              <span>👀 眼睛/眼镜焦点放大 (Eye & Glasses Boost)</span>
+              <span id="valEyeScale" class="text-[#d8653c] font-bold">1.55x</span>
+            </div>
+            <input id="rngEyeScale" type="range" min="1.0" max="2.10" step="0.05" value="1.55" class="w-full h-1.5 bg-[#e9dfd3] rounded-lg cursor-pointer">
+          </div>
+
+          <!-- Slider 3: Accessory / Top Feature Boost -->
+          <div>
+            <div class="flex justify-between font-semibold mb-1">
+              <span>👑 配饰/耳朵/发冠放大 (Accessory ★ Boost)</span>
+              <span id="valAccScale" class="text-[#d8653c] font-bold">1.35x</span>
+            </div>
+            <input id="rngAccScale" type="range" min="1.0" max="1.90" step="0.05" value="1.35" class="w-full h-1.5 bg-[#e9dfd3] rounded-lg cursor-pointer">
+          </div>
+
+          <!-- Slider 4: Expression / Quirk Distortion -->
+          <div>
+            <div class="flex justify-between font-semibold mb-1">
+              <span>🎭 抽象夸张度与墨线张力 (Abstract Quirk)</span>
+              <span id="valStrength" class="text-[#d8653c] font-bold">68%</span>
+            </div>
+            <input id="rngStrength" type="range" min="0.15" max="1.0" step="0.01" value="0.68" class="w-full h-1.5 bg-[#e9dfd3] rounded-lg cursor-pointer">
+          </div>
+
+          <!-- Slider 5: Sticker Outline & Cutout Tolerance -->
+          <div class="grid grid-cols-2 gap-3 pt-1">
+            <div>
+              <div class="flex justify-between font-semibold mb-1">
+                <span>✂️ 自动抠图容差</span>
+                <span id="valTolerance" class="text-[#6d5d53]">24%</span>
+              </div>
+              <input id="rngTolerance" type="range" min="0.05" max="0.55" step="0.01" value="0.24" class="w-full h-1.5 bg-[#e9dfd3] rounded-lg cursor-pointer">
+            </div>
+            <div>
+              <div class="flex justify-between font-semibold mb-1">
+                <span>🏷️ 精灵贴纸白边</span>
+                <span id="valOutline" class="text-[#6d5d53]">7px</span>
+              </div>
+              <input id="rngOutline" type="range" min="0" max="16" step="1" value="7" class="w-full h-1.5 bg-[#e9dfd3] rounded-lg cursor-pointer">
+            </div>
+          </div>
+
+        </div>
+
+          <!-- 3D AI Chibi Pet -->
+          <div id="chibiPanel" class="rounded-2xl border-2 border-[#f1c9b6] bg-[#fff6f0] p-3.5 flex flex-col gap-2.5">
+            <div class="flex items-center justify-between gap-2">
+              <h3 class="font-extrabold text-sm text-[#b9471f]">🧸 3D 萌宠重生成（抓取特点 · 全新形象 · 大头小身子）</h3>
+              <div class="flex items-center gap-2"><button id="btnApiSettings" type="button" class="rounded-lg border border-[#ead9cb] bg-white px-2.5 py-1.5 text-[11px] font-bold text-[#56473d]">🔑 AI 接口设置</button><span id="comfyBadge" class="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-[#f0e6da] text-[#6d5d53]">Cloud AI：检测中…</span></div>
+            </div>
+            <p class="text-[11px] text-[#7a5a4a] leading-relaxed">仅保留 AI 3D 萌宠生成：分析上传图片的外观特点，再重新设计为大头小身子的 3D 卡通桌宠。原图不会被抠图或直接套滤镜。</p>
+            <label class="text-[11px] font-semibold text-[#4a3f39]">特点补充（中英文都行，留空则使用上方自动识别的特点标签）
+              <input id="inpTraits" type="text" placeholder="例：圆框橙色眼镜、黄色耳机、卷发、大笑、深绿卫衣" class="mt-1 w-full rounded-xl border border-[#ead9cb] bg-white px-3 py-2 text-xs font-medium focus:outline-none focus:border-[#d8653c]">
+            </label>
+            <div class="grid grid-cols-2 gap-2.5">
+              <label class="text-[11px] font-semibold text-[#4a3f39]">主体类型
+                <select id="selSubject" class="mt-1 w-full rounded-xl border border-[#ead9cb] bg-white px-2 py-1.5 text-xs">
+                  <option value="person">人物（人脸优先）</option>
+                  <option value="pet">宠物 / 其他</option>
+                </select>
+              </label>
+              <label class="text-[11px] font-semibold text-[#4a3f39]">3D 质感
+                <select id="selTexture" class="mt-1 w-full rounded-xl border border-[#ead9cb] bg-white px-2 py-1.5 text-xs">
+                  <option value="blindbox">盲盒玩具 · 硬亮光树脂</option>
+                  <option value="pixar">电影级 CGI · 柔和次表面光</option>
+                  <option value="clay">哑光手捏黏土 · 指纹肌理</option>
+                  <option value="plush">蓬松布偶 · 纤维与缝线</option>
+                </select>
+              </label>
+            </div>
+            <div>
+              <div class="flex justify-between text-[11px] font-semibold mb-1">
+                <span>🎯 特点还原度（越高越像原图，越低越自由发挥）</span>
+                <span id="valSimilarity" class="text-[#6d5d53]">0.85</span>
+              </div>
+              <input id="rngSimilarity" type="range" min="0.4" max="1.1" step="0.05" value="0.85" class="w-full h-1.5 bg-[#e9dfd3] rounded-lg cursor-pointer">
+            </div>
+            <div class="flex flex-wrap items-center gap-2">
+              <button id="btnChibi3d" type="button" class="px-3.5 py-2 rounded-xl text-xs font-extrabold bg-[#d8653c] hover:bg-[#c0532c] text-white transition shadow-sm disabled:opacity-60">🧸 生成 3D 萌宠</button>
+              <button id="btnChibiReroll" type="button" class="px-3 py-2 rounded-xl text-xs font-bold bg-white border border-[#ead9cb] hover:bg-[#fff0e8] text-[#c8562e] transition">🎲 换一个</button>
+            </div>
+            <div class="rounded-xl border border-[#e9d4c4] bg-white/80 p-2.5 hidden">
+              <div class="flex flex-wrap items-center gap-2">
+                <label class="text-[11px] font-bold">AI 全身动作<select id="selMotionAction" class="ml-2 rounded-lg border px-2 py-1.5 text-xs"><option value="walk">来回走动</option><option value="jump">蹦蹦跳跳</option><option value="pickup">弯腰拿取物品</option><option value="computer">坐下使用电脑</option><option value="play">追球玩耍</option></select></label>
+                <label class="text-[11px] font-bold">表情<select id="selMotionExpression" class="ml-1 rounded-lg border px-2 py-1.5 text-xs"><option value="cheerful">开心</option><option value="curious">好奇</option><option value="focused">专注</option><option value="surprised">惊讶</option><option value="grumpy">傲娇</option></select></label>
+                <button id="btnAiMotion" type="button" class="rounded-xl bg-[#313d78] px-3 py-2 text-xs font-extrabold text-white disabled:opacity-60">🎬 生成 3 秒 AI 动作（约 $0.08）</button>
+              </div>
+              <p class="mt-1 text-[10px] leading-relaxed text-[#76685f]">此项调用 Cloudflare PixVerse 图生视频，生成的是角色肢体动作帧，不是图片缩放。首次生成新角色/动作会产生模型费用；相同角色动作会缓存复用。生成后再召唤桌宠即可播放。</p>
+            </div>
+            <p id="chibiMsg" class="text-[11px] text-[#9c4d36] min-h-[16px] leading-relaxed"></p>
+          </div>
+
+          <p id="statusMsg" class="text-[11px] text-[#9c4d36] min-h-[16px]"></p>
+      </div>
+
+    </section>
+
+    <!-- Right Column: Live Sprite Stage, Desktop Simulator & Sprite Sheet Exporter (7 cols) -->
+    <section class="lg:col-span-7 flex flex-col gap-5">
+
+      <!-- Main Preview Card -->
+      <div class="bg-white rounded-3xl p-5 shadow-sm border border-[#eadfd2] flex flex-col">
+
+        <!-- Stage Mode Tabs & Pet Name Input -->
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div class="inline-flex p-1 rounded-2xl bg-[#f3ece2] gap-1">
+            <button type="button" data-view="studio" class="view-tab active px-3.5 py-1.5 rounded-xl text-xs font-bold transition">
+              ✨ 精灵单帧/动画预览
+            </button>
+            <button type="button" data-view="desktop" class="view-tab px-3.5 py-1.5 rounded-xl text-xs font-bold text-[#5c5048] transition">
+              🖥️ Windows 桌面模拟沙盒
+            </button>
+            <button type="button" data-view="sheet" class="view-tab px-3.5 py-1.5 rounded-xl text-xs font-bold text-[#5c5048] transition">
+              🎞️ 5×4 精灵序列帧表
+            </button>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <label for="petNameInput" class="text-xs font-semibold text-[#786c63]">精灵昵称：</label>
+            <input id="petNameInput" type="text" value="橙镜小精灵" class="px-2.5 py-1 rounded-xl border border-[#dfd3c3] bg-[#faf6f0] text-xs font-bold text-[#2b2522] w-28 focus:outline-none focus:border-[#d8653c]">
+          </div>
+        </div>
+
+        <!-- VIEW 1: Studio Animated Sprite View -->
+        <div id="viewStudio" class="relative rounded-2xl checkerboard min-h-[410px] flex flex-col items-center justify-between p-4 border border-[#e2d6c5] overflow-hidden">
+          <div class="w-full flex items-center justify-between z-10">
+            <span class="px-2.5 py-1 rounded-full bg-white/85 backdrop-blur text-[11px] font-bold text-[#4a3f39] shadow-sm">
+              透明 PNG 通道已启用 · 点击精灵可互动
+            </span>
+            <span id="fpsIndicator" class="px-2.5 py-1 rounded-full bg-black/65 text-white text-[11px] font-mono">
+              STATE: IDLE · 60 FPS
+            </span>
+          </div>
+
+          <!-- Speech Bubble -->
+          <div id="studioBubble" class="mt-2 px-4 py-1.5 rounded-2xl bg-white border-2 border-[#2b2522] shadow-md text-xs font-bold text-[#2b2522] transition-all duration-200">
+            嗨！我的特点已经被抽象放大啦 ✨
+          </div>
+
+          <!-- Animated Sprite Canvas -->
+          <div class="relative flex-1 flex items-center justify-center my-1">
+            <canvas id="spriteStageCanvas" width="380" height="340" class="max-w-full h-auto cursor-pointer" title="AI 全身动作预览"></canvas>
+            <img id="aiMotionStage" class="hidden max-w-full max-h-[340px] object-contain" alt="AI-generated desktop pet motion">
+          </div>
+
+          <!-- Animation State Switcher Bar -->
+          <div class="w-full bg-white/90 backdrop-blur-md rounded-2xl p-2 border border-[#e6dacb] flex flex-wrap items-center justify-between gap-1.5 z-10">
+            <div class="flex flex-wrap items-center gap-1">
+              <button type="button" data-state="idle" class="state-btn active px-3 py-1.5 rounded-xl text-xs font-bold transition">
+                ✨ 待机呼吸
+              </button>
+              <button type="button" data-state="happy" class="state-btn px-3 py-1.5 rounded-xl text-xs font-bold text-[#544840] hover:bg-[#f2ebe1] transition">
+                🎉 开心跳跃
+              </button>
+              <button type="button" data-state="curious" class="state-btn px-3 py-1.5 rounded-xl text-xs font-bold text-[#544840] hover:bg-[#f2ebe1] transition">
+                👀 好奇歪头
+              </button>
+              <button type="button" data-state="grumpy" class="state-btn px-3 py-1.5 rounded-xl text-xs font-bold text-[#544840] hover:bg-[#f2ebe1] transition">
+                😤 傲娇抖动
+              </button>
+              <button type="button" data-state="sleepy" class="state-btn px-3 py-1.5 rounded-xl text-xs font-bold text-[#544840] hover:bg-[#f2ebe1] transition">
+                💤 犯困打盹
+              </button>
+            </div>
+            <div class="flex items-center gap-2 pr-1">
+              <span class="text-[11px] font-semibold text-[#786c63]">动效幅度</span>
+              <input id="rngAnimSpeed" type="range" min="0.4" max="2.0" step="0.1" value="1.0" class="w-20 h-1.5 bg-[#e9dfd3] rounded-lg cursor-pointer">
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 2: Interactive Windows Desktop Simulator Sandbox -->
+        <div id="viewDesktop" class="hidden relative rounded-2xl desktop-wallpaper min-h-[410px] border border-[#2f3554] overflow-hidden select-none">
+          <!-- Simulated Desktop Icons -->
+          <div class="p-4 grid grid-cols-1 gap-4 w-24 text-center text-white/90 text-[11px] pointer-events-none">
+            <div class="flex flex-col items-center gap-1">
+              <div class="w-10 h-10 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center text-xl">💻</div>
+              <span>此电脑</span>
+            </div>
+            <div class="flex flex-col items-center gap-1">
+              <div class="w-10 h-10 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center text-xl">📁</div>
+              <span>cartoon-studio</span>
+            </div>
+            <div class="flex flex-col items-center gap-1">
+              <div class="w-10 h-10 rounded-xl bg-white/10 backdrop-blur flex items-center justify-center text-xl">🎮</div>
+              <span>我的精灵</span>
+            </div>
+          </div>
+
+          <!-- Simulated Code/Note Window in Background -->
+          <div class="absolute top-6 left-28 right-6 bottom-14 bg-[#181b28]/85 backdrop-blur-md rounded-2xl border border-white/10 p-4 text-white/80 font-mono text-xs pointer-events-none hidden sm:block">
+            <div class="flex items-center gap-1.5 mb-3 pb-2 border-b border-white/10">
+              <span class="w-2.5 h-2.5 rounded-full bg-rose-400"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-amber-400"></span>
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-400"></span>
+              <span class="ml-2 text-[11px] text-white/50">desktop_pet.py — 置顶透明桌宠预览</span>
+            </div>
+            <p class="text-emerald-300"># 在这个模拟桌面上，你可以直接用鼠标拖拽右下角的精灵！</p>
+            <p class="text-white/60 mt-1">pet = DesktopSpriteApp(sprite="latest_sprite.png", topmost=True)</p>
+            <p class="text-white/60">pet.magnify_features(head=1.45, eyes=1.55, style="abstract")</p>
+            <p class="text-amber-300 mt-2">&gt; 双击精灵可切换状态，点击上方「开启自由巡游」让它在任务栏散步。</p>
+          </div>
+
+          <!-- Top Sandbox Controls -->
+          <div class="absolute top-3 right-3 flex items-center gap-2 z-20">
+            <button id="btnToggleRoam" type="button" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-amber-400 text-[#1e2238] shadow hover:bg-amber-300 transition">
+              🚶 自由巡游：开启中
+            </button>
+            <button id="btnPokePet" type="button" class="px-3 py-1.5 rounded-xl text-xs font-bold bg-white/15 hover:bg-white/25 text-white backdrop-blur transition">
+              👉 戳一戳精灵
+            </button>
+          </div>
+
+          <div id="actionBar" class="absolute bottom-14 left-3 right-3 z-20 flex flex-wrap items-center gap-2 rounded-xl bg-[#101321]/80 p-2.5 text-white backdrop-blur">
+            <span class="text-[11px] font-bold">当前动作</span><span id="sandboxActionName" class="rounded-lg bg-white/15 px-2 py-1 text-[11px]">待生成 AI 动作</span>
+            <span class="ml-auto text-[10px] text-white/70">动作可在左侧「3D 萌宠生成」中切换和生成</span>
+          </div>
+
+          <!-- Draggable Pet Container inside Desktop Sandbox -->
+          <div id="sandboxPetContainer" class="absolute cursor-grab active:cursor-grabbing z-20" style="left: 62%; top: 36%; width: 170px; height: 190px;">
+            <div id="sandboxBubble" class="mb-1 px-2.5 py-1 rounded-xl bg-[#fff8ef] border border-[#d8653c] text-[#2b2522] text-[11px] font-bold text-center shadow-lg whitespace-nowrap">
+              拖我到桌面任何地方~ ✨
+            </div>
+            <canvas id="sandboxPetCanvas" width="170" height="160" class="w-full h-auto block"></canvas>
+            <img id="aiMotionSandbox" class="hidden w-full h-auto" alt="AI pet action animation">
+          </div>
+
+          <!-- Simulated Windows 11 Taskbar -->
+          <div class="absolute bottom-0 inset-x-0 h-11 bg-[#0f111a]/90 backdrop-blur-md border-t border-white/10 px-4 flex items-center justify-between text-white/80 text-xs">
+            <div class="flex items-center gap-2">
+              <span class="px-2 py-0.5 rounded bg-white/10 text-[11px]">🌤️ 24°C 台北</span>
+            </div>
+            <div class="flex items-center gap-3 text-base">
+              <span>🪟</span>
+              <span>🔍</span>
+              <span>🎭</span>
+              <span>⚡</span>
+            </div>
+            <div class="text-[11px] font-mono">
+              <span>桌面置顶模式 · 12:39</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- VIEW 3: 5x4 Sprite Sheet Matrix View -->
+        <div id="viewSheet" class="hidden rounded-2xl checkerboard min-h-[410px] p-4 border border-[#e2d6c5] flex flex-col items-center justify-center">
+          <div class="w-full flex items-center justify-between mb-2">
+            <span class="text-xs font-bold text-[#3a312c]">标准游戏/桌宠 5行 × 4列 精灵序列帧表 (idle / happy / curious / grumpy / sleepy)</span>
+            <span class="text-[11px] font-mono text-[#6d5d53]">1024 × 1280 px · RGBA</span>
+          </div>
+          <canvas id="spriteSheetCanvas" width="640" height="800" class="max-w-full max-h-[360px] object-contain rounded-xl border border-[#d5c6b6] bg-white/40 shadow-inner"></canvas>
+        </div>
+
+        <!-- Bottom Export & Integration Bar -->
+        <div class="mt-4 pt-4 border-t border-[#efe5d8] flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2">
+            <button id="btnDownloadSingle" type="button" class="px-4 py-2.5 rounded-xl text-xs font-extrabold bg-[#d8653c] hover:bg-[#c0532c] text-white transition shadow-sm">
+              ⬇️ 下载透明精灵 PNG
+            </button>
+            <button id="btnDownloadSheet" type="button" class="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-[#2b2522] hover:bg-[#413834] text-white transition">
+              🎞️ 导出 20 帧序列图 (Sprite Sheet)
+            </button>
+            <button id="btnDownloadJson" type="button" class="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-[#eee4d7] hover:bg-[#e2d4c3] text-[#3a312c] transition">
+              📄 导出动画配置 JSON
+            </button>
+          </div>
+          <span id="exportToast" class="text-xs font-semibold text-emerald-700"></span>
+        </div>
+
+      </div>
+
+      <!-- Feature Highlights & Local Path Guide Card -->
+      <div class="bg-white rounded-3xl p-5 shadow-sm border border-[#eadfd2] grid grid-cols-1 md:grid-cols-3 gap-4 text-xs">
+        <div class="p-3.5 rounded-2xl bg-[#faf6f0] border border-[#ede3d7]">
+          <div class="font-extrabold text-[#2b2522] mb-1">🔍 1. 怎么做到「上传即放大特点」？</div>
+          <p class="text-[#6e6259] leading-relaxed">
+            采用<b>多焦点径向特征场 (Multi-Lobe Radial Warp)</b>：对头部、左右眼/眼镜、嘴巴和头顶配饰分别建立独立非线性膨胀核，配合抽象色块量化与手绘墨线，既保留原图高辨识度配色与神态，又产生极具张力的卡通变形。
+          </p>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-[#faf6f0] border border-[#ede3d7]">
+          <div class="font-extrabold text-[#2b2522] mb-1">🏃 2. 怎么变成真正的桌面精灵？</div>
+          <p class="text-[#6e6259] leading-relaxed">
+            自动剥离背景并生成<b>模切贴纸白边 + 呼吸/跳跃骨骼形变</b>。你可以直接导出 20 帧透明 Sprite Sheet，或点击右上角<b>「召唤到本机桌面」</b>直接运行配套的 <code class="bg-[#eae0d3] px-1 rounded">desktop_pet.py</code> 置顶透明窗口。
+          </p>
+        </div>
+        <div class="p-3.5 rounded-2xl bg-[#faf6f0] border border-[#ede3d7]">
+          <div class="font-extrabold text-[#2b2522] mb-1">📂 3. 本机工程目录无缝接手</div>
+          <p class="text-[#6e6259] leading-relaxed">
+            已为你打包完整的 <code class="bg-[#eae0d3] px-1 rounded">cartoon-studio</code> 升级包。解压覆盖到你电脑的 <code class="bg-[#eae0d3] px-1 rounded break-all">...\.chatgpt-projects\...\cartoon-studio</code> 后，双击 <code class="bg-[#eae0d3] px-1 rounded">start-windows.bat</code> 或 <code class="bg-[#eae0d3] px-1 rounded">launch-pet.bat</code> 即可运行。
+          </p>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Modal for Desktop Pet Summon Instructions / Status -->
+  <div id="petModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-md w-full p-6 shadow-2xl border border-[#eadfd2]">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-black text-base text-[#2b2522]" id="modalTitle">🚀 召唤桌面置顶精灵</h3>
+        <button id="btnCloseModal" type="button" class="w-8 h-8 rounded-full bg-[#f3ece2] hover:bg-[#e5dacb] text-sm font-bold">✕</button>
+      </div>
+      <div id="modalBody" class="text-xs text-[#5c5048] space-y-3 leading-relaxed">
+        <!-- Populated dynamically -->
+      </div>
+      <div class="mt-5 flex justify-end gap-2">
+        <button id="btnModalDownloadPng" type="button" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#d8653c] text-white">
+          保存当前精灵为 latest_sprite.png
+        </button>
+        <button id="btnModalOk" type="button" class="px-3.5 py-2 rounded-xl text-xs font-bold bg-[#2b2522] text-white">
+          知道了
+        </button>
+      </div>
+    </div>
+  </div>
+
+
+  <div id="apiSettingsModal" class="fixed inset-0 z-[60] hidden items-center justify-center bg-black/50 p-4">
+    <section class="w-full max-w-xl rounded-3xl bg-white p-5 shadow-2xl">
+      <div class="flex items-center justify-between"><h2 class="text-lg font-black">🔑 Cloudflare Workers AI 接口</h2><button id="btnApiClose" class="rounded-lg px-3 py-1 text-xl" aria-label="Close">×</button></div>
+      <p class="mt-2 text-xs leading-relaxed text-[#6d5d53]">填写你自己的 Cloudflare Account ID 和 API Token。令牌只保存在本机项目 .env 中；读取设置时不会返回令牌原文。已保存过令牌时，令牌栏留空即可保留。</p>
+      <div class="mt-4 grid gap-3">
+        <label class="text-xs font-bold">Account ID<input id="apiAccountId" autocomplete="off" class="mt-1 w-full rounded-xl border p-2.5 font-normal" placeholder="Cloudflare Account ID"></label>
+        <label class="text-xs font-bold">API Token<input id="apiToken" type="password" autocomplete="new-password" class="mt-1 w-full rounded-xl border p-2.5 font-normal" placeholder="粘贴具有 Workers AI 权限的 token"></label>
+        <label class="text-xs font-bold">视觉分析模型<input id="apiVisionModel" class="mt-1 w-full rounded-xl border p-2.5 font-normal" value="@cf/moondream/moondream3.1-9B-A2B"></label>
+        <label class="text-xs font-bold">图片生成模型<input id="apiImageModel" class="mt-1 w-full rounded-xl border p-2.5 font-normal" value="@cf/black-forest-labs/flux-1-schnell"></label>
+        <label class="text-xs font-bold">AI 动作视频模型<input id="apiVideoModel" class="mt-1 w-full rounded-xl border p-2.5 font-normal" value="pixverse/v6"></label>
+      </div>
+      <p id="apiSettingsStatus" class="mt-3 min-h-5 text-xs text-[#8b4a32]"></p>
+      <div class="mt-2 flex flex-wrap justify-end gap-2"><button id="btnApiTest" class="rounded-xl border px-3.5 py-2 text-xs font-bold">保存并测试接口</button><button id="btnApiSave" class="rounded-xl bg-[#d8653c] px-3.5 py-2 text-xs font-bold text-white">保存接口</button></div>
+    </section>
+  </div>
+  <script>
+    (function () {
+      // --- State ---
+      const state = {
+        preset: 'dev',
+        style: 'big',
+        headScale: 1.45,
+        eyeScale: 1.55,
+        accScale: 1.35,
+        strength: 0.68,
+        tolerance: 0.24,
+        outlinePx: 7,
+        removeBg: false,
+        customSprite: null,
+        customSpriteUrl: null,
+        aiMotionUrl: null,
+        aiMotionFile: null,
+        addBlush: true,
+        showAnchors: true,
+        animState: 'idle',
+        animSpeed: 1.0,
+        activeView: 'studio',
+        roamEnabled: true,
+        backendReady: false,
+        backendEngine: 'client-abstract-v2',
+        // Normalized focal anchors (0..1)
+        anchors: {
+          leftEye: { x: 0.38, y: 0.41 },
+          rightEye: { x: 0.62, y: 0.41 },
+          mouth: { x: 0.50, y: 0.60 },
+          accessory: { x: 0.50, y: 0.22 }
+        },
+        traits: ['圆框亮橙眼镜', '鹅黄色头戴耳机', '感染力大笑', '深青卫衣撞色']
+      };
+
+      const PRESET_CONFIGS = {
+        cat: {
+          imgId: 'presetImgCat',
+          name: '领结傲娇喵',
+          style: 'grumpy',
+          headScale: 1.52,
+          eyeScale: 1.70,
+          accScale: 1.45,
+          strength: 0.72,
+          tolerance: 0.20,
+          anchors: {
+            leftEye: { x: 0.40, y: 0.36 },
+            rightEye: { x: 0.60, y: 0.36 },
+            mouth: { x: 0.50, y: 0.49 },
+            accessory: { x: 0.50, y: 0.63 }
+          },
+          traits: ['琥珀铜铃大眼 ×1.70', '波点红领结焦点 ×1.45', '鼓鼓包子脸颊', '傲娇微蹙眉头']
+        },
+        artist: {
+          imgId: 'presetImgArtist',
+          name: '贝雷帽画师',
+          style: 'pop',
+          headScale: 1.46,
+          eyeScale: 1.58,
+          accScale: 1.50,
+          strength: 0.70,
+          tolerance: 0.25,
+          anchors: {
+            leftEye: { x: 0.41, y: 0.45 },
+            rightEye: { x: 0.59, y: 0.45 },
+            mouth: { x: 0.50, y: 0.56 },
+            accessory: { x: 0.52, y: 0.20 }
+          },
+          traits: ['明黄画家贝雷帽 ×1.50', '蓬松蓝黑大卷发', '灵动高光大眼 ×1.58', '暖橘元气腮红']
+        }
+      };
+
+      const QUOTES = {
+        idle: [
+          '嗨！我的核心特点已经被抽象放大啦 ✨',
+          '把鼠标移过来戳戳我呀~',
+          '今天也是灵感爆棚的一天！'
+        ],
+        happy: [
+          '芜湖！特点放大 150% 起飞！🎉',
+          '太酷啦！蓄力弹簧跳！',
+          '给你比个超级大大大的赞！'
+        ],
+        curious: [
+          '咦？屏幕那头在写什么好代码？👀',
+          '让我把大眼睛凑近瞧一瞧...',
+          '发现华点！原来可以这样玩！'
+        ],
+        grumpy: [
+          '哼！别乱捏我的大脸盘子！😤',
+          '本精灵需要立刻补充冰美式！',
+          '略略略~ 傲娇震动模式启动！'
+        ],
+        sleepy: [
+          '呼噜噜... 桌面待机省电中 💤',
+          '脑袋太大了，稍微打个盹...',
+          'Zzz... 叫醒我只需点一下~'
+        ]
+      };
+
+      // --- DOM Elements ---
+      const sourceCanvas = document.getElementById('sourceCanvas');
+      const sCtx = sourceCanvas.getContext('2d', { willReadFrequently: true });
+      const spriteStageCanvas = document.getElementById('spriteStageCanvas');
+      const stageCtx = spriteStageCanvas.getContext('2d');
+      const sandboxPetCanvas = document.getElementById('sandboxPetCanvas');
+      const sandboxCtx = sandboxPetCanvas.getContext('2d');
+      const spriteSheetCanvas = document.getElementById('spriteSheetCanvas');
+      const sheetCtx = spriteSheetCanvas.getContext('2d');
+
+      // Offscreen processed static sprite canvas (256x256)
+      const baseSpriteCanvas = document.createElement('canvas');
+      baseSpriteCanvas.width = 256;
+      baseSpriteCanvas.height = 256;
+      const baseSpriteCtx = baseSpriteCanvas.getContext('2d', { willReadFrequently: true });
+
+      // Offscreen source buffer (256x256)
+      const workSourceCanvas = document.createElement('canvas');
+      workSourceCanvas.width = 256;
+      workSourceCanvas.height = 256;
+      const workSourceCtx = workSourceCanvas.getContext('2d', { willReadFrequently: true });
+
+      const anchorEls = {
+        leftEye: document.getElementById('anchorLeftEye'),
+        rightEye: document.getElementById('anchorRightEye'),
+        mouth: document.getElementById('anchorMouth'),
+        accessory: document.getElementById('anchorAccessory')
+      };
+
+      // --- Load Source Image into Canvas ---
+      function loadSourceFromImageElement(imgEl) {
+        const w = sourceCanvas.width;
+        const h = sourceCanvas.height;
+        sCtx.clearRect(0, 0, w, h);
+
+        // Center-crop square
+        const iw = imgEl.naturalWidth || imgEl.width || 320;
+        const ih = imgEl.naturalHeight || imgEl.height || 320;
+        const side = Math.min(iw, ih);
+        const sx = (iw - side) / 2;
+        const sy = (ih - side) / 2;
+
+        sCtx.drawImage(imgEl, sx, sy, side, side, 0, 0, w, h);
+        workSourceCtx.clearRect(0, 0, 256, 256);
+        workSourceCtx.drawImage(imgEl, sx, sy, side, side, 0, 0, 256, 256);
+
+        renderTraitTags();
+      }
+
+      function renderTraitTags() {
+        const container = document.getElementById('traitTags');
+        container.innerHTML = '';
+        state.traits.forEach((t) => {
+          const span = document.createElement('span');
+          span.className = 'px-2 py-0.5 rounded-lg bg-[#fff0e8] text-[#b44b27] text-[11px] font-bold border border-[#f5d0bd]';
+          span.textContent = '✦ ' + t;
+          container.appendChild(span);
+        });
+      }
+
+      function syncAnchorDOM() {
+        Object.keys(anchorEls).forEach((key) => {
+          const el = anchorEls[key];
+          const pos = state.anchors[key];
+          el.style.left = (pos.x * 100).toFixed(1) + '%';
+          el.style.top = (pos.y * 100).toFixed(1) + '%';
+          el.style.display = state.showAnchors ? 'flex' : 'none';
+        });
+      }
+
+      // --- Auto Feature Analysis on Uploaded Image ---
+      function analyzeUploadedImageTraits() {
+        const imgData = workSourceCtx.getImageData(0, 0, 256, 256).data;
+        let maxSat = 0;
+        let accX = 0.5, accY = 0.25;
+        let rSum = 0, gSum = 0, bSum = 0, count = 0;
+
+        for (let y = 24; y < 220; y += 4) {
+          for (let x = 24; x < 232; x += 4) {
+            const idx = (y * 256 + x) * 4;
+            const r = imgData[idx], g = imgData[idx + 1], b = imgData[idx + 2];
+            const maxC = Math.max(r, g, b), minC = Math.min(r, g, b);
+            const sat = maxC === 0 ? 0 : (maxC - minC) / maxC;
+            if (sat > maxSat && y < 170) {
+              maxSat = sat;
+              accX = x / 256;
+              accY = y / 256;
+            }
+            rSum += r; gSum += g; bSum += b; count++;
+          }
+        }
+
+        state.anchors.leftEye = { x: 0.39, y: 0.41 };
+        state.anchors.rightEye = { x: 0.61, y: 0.41 };
+        state.anchors.mouth = { x: 0.50, y: 0.58 };
+        state.anchors.accessory = {
+          x: Math.max(0.25, Math.min(0.75, accX)),
+          y: Math.max(0.18, Math.min(0.68, accY))
+        };
+        syncAnchorDOM();
+
+        const traits = [
+          `主视觉头部膨胀 ×${state.headScale.toFixed(2)}`,
+          `眼神/镜框焦点 ×${state.eyeScale.toFixed(2)}`,
+          `高饱和特征点 (${Math.round(state.anchors.accessory.x * 100)}%, ${Math.round(state.anchors.accessory.y * 100)}%)`,
+          '智能边缘贴纸化'
+        ];
+        state.traits = traits;
+        renderTraitTags();
+      }
+
+      // --- Core Client-Side Abstract Feature-Magnifying Sprite Generator ---
+      function rebuildBaseSprite() {
+        if (state.customSprite) return; // 3D 萌宠结果优先，不被滤镜覆盖
+        const W = 256, H = 256;
+        const srcData = workSourceCtx.getImageData(0, 0, W, H);
+        const sPixels = srcData.data;
+
+        // 1. Estimate background color from outer border pixels
+        let bgR = 0, bgG = 0, bgB = 0, bgCount = 0;
+        for (let i = 0; i < W; i += 2) {
+          // Top row & left/right upper columns
+          const idxs = [
+            (2 * W + i) * 4,
+            (i * W + 2) * 4,
+            (i * W + (W - 3)) * 4
+          ];
+          for (let k = 0; k < idxs.length; k++) {
+            const p = idxs[k];
+            bgR += sPixels[p];
+            bgG += sPixels[p + 1];
+            bgB += sPixels[p + 2];
+            bgCount++;
+          }
+        }
+        bgR /= bgCount; bgG /= bgCount; bgB /= bgCount;
+
+        const outImg = baseSpriteCtx.createImageData(W, H);
+        const dPixels = outImg.data;
+        const alphaMap = new Uint8Array(W * H);
+
+        const style = state.style;
+        const strength = state.strength;
+        const headScale = state.headScale;
+        const eyeScale = state.eyeScale;
+        const accScale = state.accScale;
+        const tol = state.tolerance * 441.67;
+
+        const lx = state.anchors.leftEye.x, ly = state.anchors.leftEye.y;
+        const rx = state.anchors.rightEye.x, ry = state.anchors.rightEye.y;
+        const mx = state.anchors.mouth.x, my = state.anchors.mouth.y;
+        const ax = state.anchors.accessory.x, ay = state.anchors.accessory.y;
+
+        // Style parameters
+        const headPull = (headScale - 1.0) * 0.56;
+        const eyePull = (eyeScale - 1.0) * 0.54;
+        const accPull = (accScale - 1.0) * 0.46;
+        const quirk = style === 'weird' ? 0.45 * strength
+                    : style === 'grumpy' ? -0.38 * strength
+                    : 0.20 * strength;
+
+        const pixelSize = style === 'pixel' ? 4 : 1;
+        const posterLevels = style === 'geo' ? 5 : style === 'pop' ? 6 : 9;
+
+        for (let y = 0; y < H; y++) {
+          for (let x = 0; x < W; x++) {
+            // Quantize coordinates if pixel style or geometric faceted style
+            const qx = pixelSize > 1 ? Math.floor(x / pixelSize) * pixelSize : x;
+            const qy = pixelSize > 1 ? Math.floor(y / pixelSize) * pixelSize : y;
+
+            let nx = qx / W;
+            let ny = qy / H;
+
+            // Geometric angular facet offset
+            if (style === 'geo') {
+              const cell = 18;
+              const gx = Math.floor(qx / cell);
+              const gy = Math.floor(qy / cell);
+              nx += Math.sin(gx * 1.7 + gy * 2.3) * 0.012 * strength;
+              ny += Math.cos(gx * 2.1 - gy * 1.4) * 0.012 * strength;
+            }
+
+            // A. Global Chibi Head Expansion & Cute Lower Body Taper
+            const hdx = nx - 0.50;
+            const hdy = ny - 0.43;
+            const hr = Math.hypot(hdx, hdy);
+            const hRad = 0.45;
+            if (hr < hRad) {
+              const t = 1.0 - hr / hRad;
+              const f = 1.0 - headPull * (t * t);
+              nx = 0.50 + hdx * f;
+              ny = 0.43 + hdy * f;
+            }
+            // Taper lower body into compact sprite silhouette
+            if (ny > 0.64) {
+              const bt = (ny - 0.64) / 0.36;
+              nx = 0.50 + (nx - 0.50) / (1.0 - bt * 0.30);
+            }
+
+            // B. Left & Right Eye Magnifiers (with optional weird asymmetry)
+            const leftBoost = style === 'weird' ? eyePull * 1.25 : eyePull;
+            const rightBoost = style === 'weird' ? eyePull * 0.78 : eyePull;
+            const eyeRad = 0.155;
+
+            const ldx = nx - lx, ldy = ny - ly;
+            const lr = Math.hypot(ldx, ldy);
+            if (lr < eyeRad) {
+              const lt = 1.0 - lr / eyeRad;
+              const lf = 1.0 - leftBoost * Math.pow(lt, 1.6);
+              nx = lx + ldx * lf;
+              ny = ly + ldy * lf;
+            }
+
+            const rdx = nx - rx, rdy = ny - ry;
+            const rr = Math.hypot(rdx, rdy);
+            if (rr < eyeRad) {
+              const rt = 1.0 - rr / eyeRad;
+              const rf = 1.0 - rightBoost * Math.pow(rt, 1.6);
+              nx = rx + rdx * rf;
+              ny = ry + rdy * rf;
+            }
+
+            // C. Accessory / Distinctive Feature Anchor Magnification
+            const adx = nx - ax, ady = ny - ay;
+            const ar = Math.hypot(adx, ady);
+            const accRad = 0.19;
+            if (ar < accRad) {
+              const at = 1.0 - ar / accRad;
+              const af = 1.0 - accPull * Math.pow(at, 1.5);
+              nx = ax + adx * af;
+              ny = ay + ady * af;
+            }
+
+            // D. Mouth & Expression Curvature Warp
+            const mdx = nx - mx, mdy = ny - my;
+            const mr = Math.hypot(mdx, mdy);
+            const mRad = 0.19;
+            if (mr < mRad) {
+              const mt = 1.0 - mr / mRad;
+              const mf = 1.0 - Math.abs(quirk) * 0.42 * mt;
+              nx = mx + mdx * mf;
+              ny = my + mdy * mf - quirk * 0.045 * mt * (1.0 - Math.min(1.0, Math.abs(mdx) * 4.5));
+            }
+
+            // Clamp source pixel coordinates
+            const sx = Math.max(1, Math.min(W - 2, Math.round(nx * (W - 1))));
+            const sy = Math.max(1, Math.min(H - 2, Math.round(ny * (H - 1))));
+            const sIdx = (sy * W + sx) * 4;
+
+            let r = sPixels[sIdx];
+            let g = sPixels[sIdx + 1];
+            let b = sPixels[sIdx + 2];
+
+            // Background cutout check
+            let alpha = 255;
+            if (state.removeBg) {
+              const distBg = Math.hypot(r - bgR, g - bgG, b - bgB);
+              const centerDist = Math.hypot((x / W - 0.5) / 0.45, (y / H - 0.52) / 0.46);
+              // Keep central character core solid, cut outer background matching corner color
+              if (centerDist > 0.96 || (centerDist > 0.56 && distBg < tol)) {
+                alpha = 0;
+              } else if (centerDist > 0.52 && distBg < tol * 1.25) {
+                alpha = Math.round(((distBg - tol) / (tol * 0.25)) * 255);
+              }
+            }
+
+            if (alpha === 0) {
+              alphaMap[y * W + x] = 0;
+              continue;
+            }
+
+            // E. Color Abstraction (Saturation + Contrast + Posterize)
+            const avg = (r + g + b) / 3;
+            const satMult = style === 'pop' ? 1.65 : style === 'geo' ? 1.50 : 1.38;
+            r = avg + (r - avg) * satMult;
+            g = avg + (g - avg) * satMult;
+            b = avg + (b - avg) * satMult;
+
+            // Contrast & warm/pop tint
+            const con = 1.15 + strength * 0.22;
+            r = (r - 128) * con + 132;
+            g = (g - 128) * con + 129;
+            b = (b - 128) * con + 125;
+
+            if (style === 'pop') {
+              // Halftone dots overlay
+              const dot = (Math.sin(x * 0.85) * Math.cos(y * 0.85)) > 0.55 ? 18 : 0;
+              r += dot; g -= dot * 0.5; b += dot;
+            }
+
+            // Posterize color bands
+            const step = 255 / posterLevels;
+            r = Math.round(Math.max(0, Math.min(255, r)) / step) * step;
+            g = Math.round(Math.max(0, Math.min(255, g)) / step) * step;
+            b = Math.round(Math.max(0, Math.min(255, b)) / step) * step;
+
+            // F. Bold Comic Edge Detection (Sobel approximation on source)
+            const idxR = (sy * W + (sx + 1)) * 4;
+            const idxD = ((sy + 1) * W + sx) * 4;
+            const lumC = (sPixels[sIdx] + sPixels[sIdx + 1] + sPixels[sIdx + 2]) / 3;
+            const lumR = (sPixels[idxR] + sPixels[idxR + 1] + sPixels[idxR + 2]) / 3;
+            const lumD = (sPixels[idxD] + sPixels[idxD + 1] + sPixels[idxD + 2]) / 3;
+            const grad = Math.abs(lumC - lumR) + Math.abs(lumC - lumD);
+
+            const edgeThresh = 38 - strength * 16;
+            if (grad > edgeThresh) {
+              const inkRatio = Math.min(0.88, (grad - edgeThresh) / 42);
+              r = r * (1 - inkRatio) + 34 * inkRatio;
+              g = g * (1 - inkRatio) + 25 * inkRatio;
+              b = b * (1 - inkRatio) + 29 * inkRatio;
+            }
+
+            const dIdx = (y * W + x) * 4;
+            dPixels[dIdx] = Math.max(0, Math.min(255, r));
+            dPixels[dIdx + 1] = Math.max(0, Math.min(255, g));
+            dPixels[dIdx + 2] = Math.max(0, Math.min(255, b));
+            dPixels[dIdx + 3] = alpha;
+            alphaMap[y * W + x] = alpha > 120 ? 1 : 0;
+          }
+        }
+
+        // G. Die-Cut Sticker Outline Pass around Transparent Foreground
+        const rad = state.outlinePx;
+        if (state.removeBg && rad > 0) {
+          for (let y = rad; y < H - rad; y++) {
+            for (let x = rad; x < W - rad; x++) {
+              if (alphaMap[y * W + x] === 1) continue;
+              let nearFg = false;
+              for (let dy = -rad; dy <= rad && !nearFg; dy += 2) {
+                for (let dx = -rad; dx <= rad; dx += 2) {
+                  if (dx * dx + dy * dy <= rad * rad) {
+                    if (alphaMap[(y + dy) * W + (x + dx)] === 1) {
+                      nearFg = true;
+                      break;
+                    }
+                  }
+                }
+              }
+              if (nearFg) {
+                const dIdx = (y * W + x) * 4;
+                // Sticker cream-white border with subtle dark outer rim
+                dPixels[dIdx] = 255;
+                dPixels[dIdx + 1] = 251;
+                dPixels[dIdx + 2] = 244;
+                dPixels[dIdx + 3] = 255;
+              }
+            }
+          }
+        }
+
+        baseSpriteCtx.putImageData(outImg, 0, 0);
+
+        // H. Optional Cute Sprite Overlays (Rosy Blush + Eye Sparkles + Comic Accent)
+        if (state.addBlush) {
+          baseSpriteCtx.save();
+          // Rosy cheeks below left and right eyes
+          const blushY = ((ly + ry) * 0.5 + 0.085) * H;
+          const blushLX = (lx - 0.05) * W;
+          const blushRX = (rx + 0.05) * W;
+
+          baseSpriteCtx.fillStyle = 'rgba(255, 105, 95, 0.34)';
+          baseSpriteCtx.beginPath();
+          baseSpriteCtx.ellipse(blushLX, blushY, 15, 8, -0.1, 0, Math.PI * 2);
+          baseSpriteCtx.fill();
+
+          baseSpriteCtx.beginPath();
+          baseSpriteCtx.ellipse(blushRX, blushY, 15, 8, 0.1, 0, Math.PI * 2);
+          baseSpriteCtx.fill();
+
+          // Anime eye catchlights
+          baseSpriteCtx.fillStyle = 'rgba(255, 255, 255, 0.92)';
+          baseSpriteCtx.beginPath();
+          baseSpriteCtx.arc(lx * W - 4, ly * H - 4, 3.8 * (eyeScale * 0.7), 0, Math.PI * 2);
+          baseSpriteCtx.arc(rx * W - 4, ry * H - 4, 3.8 * (eyeScale * 0.7), 0, Math.PI * 2);
+          baseSpriteCtx.fill();
+          baseSpriteCtx.restore();
+        }
+
+        // Refresh 5x4 Sprite Sheet
+        renderSpriteSheet();
+      }
+
+      // --- Compute Pose Transform for Any State & Phase (0..1) ---
+      function getPoseTransform(animState, phase) {
+        const t = phase * Math.PI * 2;
+        let sx = 1.0, sy = 1.0, dy = 0, dx = 0, angle = 0, emote = '';
+
+        if (animState === 'idle') {
+          sx = 1.0 + Math.sin(t) * 0.04;
+          sy = 1.0 - Math.sin(t) * 0.04;
+          dy = Math.sin(t) * 6;
+          emote = '✨';
+        } else if (animState === 'happy') {
+          const bounce = Math.abs(Math.sin(t));
+          sx = 1.0 - bounce * 0.09 + (1 - bounce) * 0.07;
+          sy = 1.0 + bounce * 0.11 - (1 - bounce) * 0.07;
+          dy = -bounce * 26;
+          angle = Math.sin(t) * 0.10;
+          emote = '🎵';
+        } else if (animState === 'curious') {
+          angle = Math.sin(t) * 0.18;
+          sx = 1.04;
+          sy = 0.98;
+          dx = Math.sin(t) * 6;
+          emote = '❓';
+        } else if (animState === 'grumpy') {
+          dx = Math.sin(t * 4) * 4;
+          dy = Math.cos(t * 3) * 3;
+          angle = Math.sin(t * 3) * 0.08;
+          sx = 1.06 + Math.sin(t * 2) * 0.03;
+          sy = 0.96;
+          emote = '💢';
+        } else if (animState === 'sleepy') {
+          sx = 1.03 + Math.sin(t) * 0.03;
+          sy = 0.93 - Math.sin(t) * 0.03;
+          dy = 8 + Math.sin(t) * 3;
+          angle = 0.05;
+          emote = '💤';
+        }
+        return { sx, sy, dx, dy, angle, emote };
+      }
+
+      function drawAnimatedSpriteFrame(ctx, cw, ch, animState, phase, drawEmote = true) {
+        ctx.clearRect(0, 0, cw, ch);
+        const pose = getPoseTransform(animState, phase);
+        const baseSize = Math.min(cw, ch) * 0.76;
+
+        // Ground shadow
+        const shadowY = ch * 0.86;
+        const shadowRx = Math.max(18, baseSize * 0.30 * pose.sx * (1 + pose.dy / 90));
+        ctx.save();
+        ctx.fillStyle = 'rgba(35, 28, 24, 0.24)';
+        ctx.beginPath();
+        ctx.ellipse(cw / 2 + pose.dx, shadowY, shadowRx, 9, 0, 0, Math.PI * 2);
+        ctx.fill();
+        …299 tokens truncated…          subCanvas.height = cellH;
+            const subCtx = subCanvas.getContext('2d');
+            drawAnimatedSpriteFrame(subCtx, cellW, cellH, st, phase, true);
+            sheetCtx.drawImage(subCanvas, c * cellW, r * cellH);
+
+            // Subtle frame label
+            sheetCtx.save();
+            sheetCtx.fillStyle = 'rgba(43, 37, 34, 0.55)';
+            sheetCtx.font = 'bold 10px monospace';
+            sheetCtx.fillText(`${st}[${c}]`, c * cellW + 6, r * cellH + 14);
+            sheetCtx.restore();
+          }
+        }
+      }
+
+      // --- Character actions with travel and interactive props (not whole-image wobble) ---
+      const langs=[['en','English'],['zh','简体中文'],['es','Español'],['hi','हिन्दी'],['ar','العربية'],['bn','বাংলা'],['pt','Português'],['ru','Русский'],['ja','日本語'],['pa','ਪੰਜਾਬੀ'],['de','Deutsch'],['fr','Français'],['ko','한국어'],['vi','Tiếng Việt'],['it','Italiano'],['tr','Türkçe'],['fa','فارسی'],['sw','Kiswahili'],['th','ไทย'],['jv','Basa Jawa'],['mr','मराठी'],['te','తెలుగు'],['ta','தமிழ்'],['ur','اردو'],['gu','ગુજરાતી'],['pl','Polski'],['uk','Українська'],['nl','Nederlands'],['id','Bahasa Indonesia'],['ms','Bahasa Melayu']];
+      const langSel=document.getElementById('languageSelect');
+      langs.forEach(([v,n])=>{const o=document.createElement('option');o.value=v;o.textContent=n;langSel.appendChild(o)});
+      langSel.value=localStorage.getItem('desktopPetLanguage')||'en';
+      const enUI={
+        '抽象桌面精灵工坊 · Cartoon Sprite Studio':'Desktop AI Pet Studio · Cartoon Sprite Studio','抽象桌面精灵工坊':'Desktop AI Pet Studio',
+        '上传一张图 → 自动提取主体 → 非线性放大五官/神态特点 → 生成多状态透明桌面精灵':'Upload an image → extract its distinctive traits → generate a multi-action 3D desktop pet',
+        '引擎：实时抽象特征内核（双击 start-windows.bat 可连本机服务）':'Engine: connecting to local AI service…','🚀 召唤到本机桌面':'🚀 Summon to desktop',
+        '上传原图 & 焦点特征锚点':'1. Upload an image','🎯 自动定位特点':'🎯 Detect features','示例一键试玩：':'Try a sample:',
+        '橙镜极客':'Orange-glasses geek','领结傲娇喵':'Bow-tie cat','贝雷帽卷发':'Beret artist','拖动圆点可指定要放大的特点部位':'Drag the markers to highlight facial features',
+        'L/R眼 · M嘴 · ★配饰':'L/R eyes · M mouth · ★ accessory','点击上传你的照片 / 拖拽图片':'Click to upload or drag an image here',
+        '支持人像、萌宠、二次元或任意物体':'Supports people, pets, anime, or other images','🔍 识别到的显著视觉特点':'🔍 Detected visual traits','显示锚点':'Show markers',
+        '抽象精灵风格流派':'2. Choose a character style','点击任一流派会立即调用图片 AI 按所选风格重新生成，并消耗该模型的额度。':'Click a style to regenerate the pet with the image model; this uses its quota.','🎲 随机灵魂暴走':'🎲 Random style',
+        '夸张大头萌系':'Exaggerated chibi','Q版大头 + 闪亮大眼 + 饱满色块':'Big head, sparkling eyes, bold colors',
+        '怪诞超现实':'Surreal oddball','大小眼不对称 + 戏剧感扭曲神态':'Quirky asymmetry and dramatic expression',
+        '几何立体抽象':'Geometric abstract','毕加索式切面 + 撞色几何拼贴':'Cubist facets and bold geometric colors',
+        '俏皮讽刺漫画像':'Satirical comic','粗犷手绘墨线 + 傲娇嘴角强化':'Expressive ink lines and cheeky smirk',
+        '潮流波普贴纸':'Pop-art sticker','高反差撞色 + 漫画网点 + 霓虹光晕':'High contrast, halftone, neon accents',
+        '复古像素桌宠':'Retro pixel pet','16-Bit 像素颗粒 + 街机精灵质感':'16-bit pixels and arcade style',
+        'AI 萌宠生成':'3. Generate your AI pet','🧸 3D 萌宠重生成（抓取特点 · 全新形象 · 大头小身子）':'🧸 Generate a new 3D chibi pet',
+        '🔑 AI 接口设置':'🔑 AI API settings','Cloud AI：检测中…':'Cloud AI: checking…',
+        '仅保留 AI 3D 萌宠生成：分析上传图片的外观特点，再重新设计为大头小身子的 3D 卡通桌宠。原图不会被抠图或直接套滤镜。':'AI-only 3D pet creation. The uploaded image is analyzed for visible traits, then redesigned as a new big-head, small-body cartoon. No cutout or photo filter is used.',
+        '特点补充（中英文都行，留空则使用上方自动识别的特点标签）':'Extra traits (optional; auto-detected traits are used when blank)',
+        '主体类型':'Subject','人物（人脸优先）':'Person','宠物 / 其他':'Pet / other','3D 质感':'3D finish',
+        '盲盒玩具（光滑树脂）':'Vinyl collectible','皮克斯动画':'Animated film','黏土手作':'Clay figure','毛绒玩偶':'Plush toy',
+        '🎯 特点还原度（越高越像原图，越低越自由发挥）':'🎯 Trait similarity (higher keeps more details)','🧸 生成 3D 萌宠':'🧸 Generate 3D pet','🎲 换一个':'🎲 Regenerate',
+        'AI 全身动作':'AI full-body action','表情':'Expression','开心':'Cheerful','好奇':'Curious','专注':'Focused','惊讶':'Surprised','傲娇':'Grumpy','来回走动':'Walk around','蹦蹦跳跳':'Jump','弯腰拿取物品':'Pick up an item','坐下使用电脑':'Use a computer','追球玩耍':'Play with a ball',
+        '🎬 生成 3 秒 AI 动作（约 $0.08）':'🎬 Generate 3s AI motion (~$0.08)',
+        '此项调用 Cloudflare PixVerse 图生视频，生成的是角色肢体动作帧，不是图片缩放。首次生成新角色/动作会产生模型费用；相同角色动作会缓存复用。生成后再召唤桌宠即可播放。':'Uses Cloudflare PixVerse image-to-video to animate the character’s body, not scale the still image. Model fees apply the first time for each pet/action; repeat requests use the local cache. Generate an action before summoning the pet.',
+        '✨ 精灵单帧/动画预览':'✨ Pet preview','🖥️ Windows 桌面模拟沙盒':'🖥️ Desktop sandbox','🎞️ 5×4 精灵序列帧表':'🎞️ Sprite sheet',
+        '精灵昵称：':'Pet name:','透明 PNG 通道已启用 · 点击精灵可互动':'Transparent background · click the pet to interact',
+        '嗨！我的特点已经被抽象放大啦 ✨':'Hi! My features are larger than life ✨','✨ 待机呼吸':'✨ Idle','🎉 开心跳跃':'🎉 Happy jump','👀 好奇歪头':'👀 Curious','😤 傲娇抖动':'😤 Grumpy','💤 犯困打盹':'💤 Sleepy','动效幅度':'Motion speed',
+        '此电脑':'This PC','我的精灵':'My pets','desktop_pet.py — 置顶透明桌宠预览':'desktop_pet.py — transparent desktop pet',
+        '# 在这个模拟桌面上，你可以直接用鼠标拖拽右下角的精灵！':'# Drag the pet around this desktop sandbox.',
+        '> 双击精灵可切换状态，点击上方「开启自由巡游」让它在任务栏散步。':'> Double-click to change its mood, or enable roaming above.',
+        '🚶 自由巡游：开启中':'🚶 Roaming: on','👉 戳一戳精灵':'👉 Poke pet','当前动作':'Current action','待生成 AI 动作':'Generate an AI action first','动作可在左侧「3D 萌宠生成」中切换和生成':'Choose and generate actions in the 3D pet panel',
+        '拖我到桌面任何地方~ ✨':'Drag me anywhere on the desktop ✨','🌤️ 24°C 台北':'🌤️ 24°C Taipei','桌面置顶模式 · 12:39':'Always on top · 12:39',
+        '标准游戏/桌宠 5行 × 4列 精灵序列帧表 (idle / happy / curious / grumpy / sleepy)':'Standard 5 × 4 game-pet sprite sheet (idle / happy / curious / grumpy / sleepy)',
+        '⬇️ 下载透明精灵 PNG':'⬇️ Download transparent PNG','🎞️ 导出 20 帧序列图 (Sprite Sheet)':'🎞️ Export 20-frame sprite sheet','📄 导出动画配置 JSON':'📄 Export animation manifest JSON',
+        '🔍 1. 怎么做到「上传即放大特点」？':'🔍 1. How does trait extraction work?','采用':'We use','多焦点径向特征场 (Multi-Lobe Radial Warp)':'AI vision to identify visible traits',
+        '：对头部、左右眼/眼镜、嘴巴和头顶配饰分别建立独立非线性膨胀核，配合抽象色块量化与手绘墨线，既保留原图高辨识度配色与神态，又产生极具张力的卡通变形。':': hair, glasses, accessories, expression and colors guide a newly generated cartoon character.',
+        '🏃 2. 怎么变成真正的桌面精灵？':'🏃 2. How does it become a desktop pet?','自动剥离背景并生成':'The AI creates a new character with a transparent background and',
+        '模切贴纸白边 + 呼吸/跳跃骨骼形变':'AI-generated full-body motion',
+        '。你可以直接导出 20 帧透明 Sprite Sheet，或点击右上角':'。Export a sprite sheet or click',
+        '「召唤到本机桌面」':'“Summon to desktop”','直接运行配套的':'to launch the included','置顶透明窗口。':'always-on-top transparent window.',
+        '📂 3. 本机工程目录无缝接手':'📂 3. Local project setup','已为你打包完整的':'The project package is ready:','升级包。解压覆盖到你电脑的':'Extract it to:',
+        '后，双击':'then double-click','或':'or','即可运行。':'to start the app.',
+        '🚀 召唤桌面置顶精灵':'🚀 Summon desktop pet','保存当前精灵为 latest_sprite.png':'Save current pet as latest_sprite.png','知道了':'OK',
+        '🔑 Cloudflare Workers AI 接口':'🔑 Cloudflare Workers AI API','填写你自己的 Cloudflare Account ID 和 API Token。令牌只保存在本机项目 .env 中；读取设置时不会返回令牌原文。已保存过令牌时，令牌栏留空即可保留。':'Enter your Cloudflare Account ID and API Token. The token is saved only in the local .env file and is never returned to the page. Leave it blank to keep a saved token.',
+        '盲盒玩具 · 硬亮光树脂':'Blind-box toy · glossy resin','电影级 CGI · 柔和次表面光':'Film CGI · soft subsurface light','哑光手捏黏土 · 指纹肌理':'Matte hand-sculpted clay · fingerprints','蓬松布偶 · 纤维与缝线':'Fuzzy plush · fibers and seams','视觉分析模型':'Vision model','图片生成模型':'Image model','AI 动作视频模型':'AI video model','保存并测试接口':'Save & test API','保存接口':'Save API'
+      };
+      // Offline translations for the essential generation controls keep the page
+      // usable in all 30 locales even when the cloud translation quota is busy.
+      const offlineLabelKeys=['1. Upload an image','2. Choose a character style','3. Generate your AI pet','Subject','Person','Pet / other','3D finish','Generate 3D pet','Regenerate'];
+      const offlineLabels={
+        es:['1. Subir imagen','2. Elegir estilo','3. Crear mascota con IA','Sujeto','Persona','Mascota / otro','Acabado 3D','Crear mascota 3D','Regenerar'],
+        hi:['1. चित्र अपलोड करें','2. शैली चुनें','3. AI पालतू बनाएँ','विषय','व्यक्ति','पालतू / अन्य','3D रूप','3D पालतू बनाएँ','फिर से बनाएँ'],
+        ar:['١. ارفع صورة','٢. اختر نمطًا','٣. أنشئ حيوانًا أليفًا بالذكاء الاصطناعي','الموضوع','شخص','حيوان أليف / غير ذلك','مظهر ثلاثي الأبعاد','أنشئ حيوانًا أليفًا ثلاثي الأبعاد','أنشئ من جديد'],
+        bn:['১. ছবি আপলোড করুন','২. স্টাইল বেছে নিন','৩. AI পোষা সঙ্গী তৈরি করুন','বিষয়','ব্যক্তি','পোষা প্রাণী / অন্যান্য','3D রূপ','3D পোষা সঙ্গী তৈরি করুন','আবার তৈরি করুন'],
+        pt:['1. Enviar imagem','2. Escolher estilo','3. Criar mascote com IA','Tema','Pessoa','Mascote / outro','Acabamento 3D','Criar mascote 3D','Gerar novamente'],
+        ru:['1. Загрузить изображение','2. Выбрать стиль','3. Создать питомца с ИИ','Объект','Человек','Питомец / другое','3D-отделка','Создать 3D-питомца','Создать заново'],
+        ja:['1. 画像をアップロード','2. スタイルを選択','3. AIペットを作成','対象','人物','ペット / その他','3Dの質感','3Dペットを作成','再生成'],
+        pa:['1. ਤਸਵੀਰ ਅੱਪਲੋਡ ਕਰੋ','2. ਸ਼ੈਲੀ ਚੁਣੋ','3. AI ਪਾਲਤੂ ਸਾਥੀ ਬਣਾਓ','ਵਿਸ਼ਾ','ਵਿਅਕਤੀ','ਪਾਲਤੂ / ਹੋਰ','3D ਰੂਪ','3D ਪਾਲਤੂ ਬਣਾਓ','ਮੁੜ ਬਣਾਓ'],
+        de:['1. Bild hochladen','2. Stil wählen','3. KI-Haustier erstellen','Motiv','Person','Haustier / anderes','3D-Oberfläche','3D-Haustier erstellen','Neu erstellen'],
+        fr:['1. Importer une image','2. Choisir un style','3. Créer un compagnon IA','Sujet','Personne','Animal / autre','Finition 3D','Créer le compagnon 3D','Régénérer'],
+        ko:['1. 이미지 업로드','2. 스타일 선택','3. AI 반려 캐릭터 만들기','대상','사람','반려동물 / 기타','3D 질감','3D 캐릭터 만들기','다시 만들기'],
+        vi:['1. Tải ảnh lên','2. Chọn phong cách','3. Tạo thú cưng AI','Đối tượng','Người','Thú cưng / khác','Chất liệu 3D','Tạo thú cưng 3D','Tạo lại'],
+        it:['1. Carica un’immagine','2. Scegli uno stile','3. Crea un compagno IA','Soggetto','Persona','Animale / altro','Finitura 3D','Crea compagno 3D','Rigenera'],
+        tr:['1. Görsel yükle','2. Stil seç','3. Yapay zekâ evcil dostu oluştur','Konu','Kişi','Evcil hayvan / diğer','3B doku','3B dost oluştur','Yeniden oluştur'],
+        fa:['۱. تصویر بارگذاری کنید','۲. سبک را انتخاب کنید','۳. حیوان خانگی هوشمند بسازید','موضوع','شخص','حیوان خانگی / سایر','بافت سه‌بعدی','حیوان سه‌بعدی بسازید','ساخت دوباره'],
+        sw:['1. Pakia picha','2. Chagua mtindo','3. Unda mnyama wa AI','Mhusika','Mtu','Mnyama / nyingine','Mwonekano wa 3D','Unda mnyama wa 3D','Unda tena'],
+        th:['1. อัปโหลดรูปภาพ','2. เลือกสไตล์','3. สร้างสัตว์เลี้ยง AI','ตัวแบบ','บุคคล','สัตว์เลี้ยง / อื่น ๆ','พื้นผิว 3 มิติ','สร้างสัตว์เลี้ยง 3 มิติ','สร้างอีกครั้ง'],
+        jv:['1. Unggah gambar','2. Pilih gaya','3. Gawe kewan AI','Subjek','Wong','Kewan / liyane','Tekstur 3D','Gawe kewan 3D','Gawe maneh'],
+        mr:['१. प्रतिमा अपलोड करा','२. शैली निवडा','३. AI पाळीव साथीदार तयार करा','विषय','व्यक्ती','पाळीव प्राणी / इतर','3D पोत','3D साथीदार तयार करा','पुन्हा तयार करा'],
+        te:['1. చిత్రాన్ని అప్‌లోడ్ చేయండి','2. శైలిని ఎంచుకోండి','3. AI పెంపుడు స్నేహితుడిని సృష్టించండి','విషయం','వ్యక్తి','పెంపుడు జంతువు / ఇతర','3D ఆకృతి','3D పెంపుడు స్నేహితుడిని సృష్టించండి','మళ్లీ సృష్టించండి'],
+        ta:['1. படத்தைப் பதிவேற்றவும்','2. பாணியைத் தேர்ந்தெடுக்கவும்','3. AI செல்லப்பிராணியை உருவாக்கவும்','பொருள்','நபர்','செல்லப்பிராணி / மற்றவை','3D தோற்றம்','3D செல்லப்பிராணியை உருவாக்கவும்','மீண்டும் உருவாக்கவும்'],
+        ur:['۱. تصویر اپ لوڈ کریں','۲. انداز منتخب کریں','۳. AI پالتو ساتھی بنائیں','موضوع','شخص','پالتو جانور / دیگر','3D ساخت','3D پالتو ساتھی بنائیں','دوبارہ بنائیں'],
+        gu:['1. છબી અપલોડ કરો','2. શૈલી પસંદ કરો','3. AI પાળતુ સાથી બનાવો','વિષય','વ્યક્તિ','પાળતુ / અન્ય','3D દેખાવ','3D પાળતુ બનાવો','ફરી બનાવો'],
+        pl:['1. Prześlij obraz','2. Wybierz styl','3. Utwórz pupila AI','Obiekt','Osoba','Pupil / inne','Wykończenie 3D','Utwórz pupila 3D','Utwórz ponownie'],
+        uk:['1. Завантажити зображення','2. Обрати стиль','3. Створити улюбленця ШІ','Об’єкт','Людина','Улюбленець / інше','3D-оздоблення','Створити 3D-улюбленця','Створити знову'],
+        nl:['1. Afbeelding uploaden','2. Stijl kiezen','3. AI-huisdier maken','Onderwerp','Persoon','Huisdier / anders','3D-afwerking','3D-huisdier maken','Opnieuw maken'],
+        id:['1. Unggah gambar','2. Pilih gaya','3. Buat peliharaan AI','Subjek','Orang','Peliharaan / lainnya','Tekstur 3D','Buat peliharaan 3D','Buat ulang'],
+        ms:['1. Muat naik imej','2. Pilih gaya','3. Cipta haiwan AI','Subjek','Orang','Haiwan / lain-lain','Tekstur 3D','Cipta haiwan 3D','Cipta semula']
+      };
+      function offlineLabel(code,original){let english=enUI[original]||original;english=english.replace(/^🧸\s*/,'').replace(/^🎲\s*/,'');const i=offlineLabelKeys.indexOf(english);return i>=0?offlineLabels[code]?.[i]||'': '';}
+      const originalTextNodes=new Map();
+      const localizedCache=new Map();
+      const translationStoragePrefix='desktopPetTranslation:';
+      for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith(translationStoragePrefix)){try{localizedCache.set(k.slice(translationStoragePrefix.length),localStorage.getItem(k));}catch(_e){}}}
+      let languageRun=0;
+      async function applyLanguage(code){
+        const run=++languageRun;localStorage.setItem('desktopPetLanguage',code);
+        document.documentElement.lang=code==='zh'?'zh-CN':code;
+        document.documentElement.dir=['ar','fa','ur'].includes(code)?'rtl':'ltr';
+        const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);let node;
+        while((node=walker.nextNode())){
+          const parent=node.parentElement;
+          if(!parent||parent.closest('script,style,input,textarea,code,pre,[aria-hidden="true"]'))continue;
+          if(!originalTextNodes.has(node))originalTextNodes.set(node,node.nodeValue);
+        }
+        for(const [textNode,original] of originalTextNodes){
+          const trimmed=original.trim();if(!trimmed)continue;
+          const lead=original.match(/^\s*/)[0],tail=original.match(/\s*$/)[0];
+          let value=trimmed;
+          if(code==='zh')value=trimmed;
+          else if(code==='en')value=enUI[trimmed]||trimmed;
+          else value=offlineLabel(code,trimmed)||enUI[trimmed]||trimmed;
+          textNode.nodeValue=lead+value+tail;
+        }
+        document.title=code==='zh'?'桌面 AI 精灵 · 3D 萌宠工坊':'Desktop AI Pet Studio · Cartoon Sprite Studio';
+        const file=document.getElementById('fileInput');if(file)file.title=code==='zh'?'选择图片生成精灵':'Choose an image to create a pet';
+        const trait=document.getElementById('inpTraits');if(trait)trait.placeholder=code==='zh'?'例：圆框橙色眼镜、黄色耳机、卷发、大笑':'e.g. orange round glasses, yellow headphones, curly hair';
+        if(code==='zh')return;
+        const needsTranslation=[...originalTextNodes].filter(([n,original])=>/\p{Script=Han}/u.test(original.trim())&&!(code==='en'&&enUI[original.trim()])&&!offlineLabel(code,original.trim()));
+        const select=document.getElementById('languageSelect');select.disabled=true;select.title='Translating the interface…';
+        try{
+          for(let i=0;i<needsTranslation.length;i+=12){
+            const batch=needsTranslation.slice(i,i+12);
+            const cacheKeys=batch.map(([,original])=>code+'\0'+original.trim());
+            const missing=batch.filter(([,original],j)=>!localizedCache.has(cacheKeys[j])&&!localStorage.getItem(translationStoragePrefix+cacheKeys[j]));
+            for(const sourceLanguage of ['english','chinese']){
+              const group=missing.filter(([,original])=>(enUI[original.trim()]?'english':'chinese')===sourceLanguage);
+              if(!group.length)continue;
+              const requestTexts=group.map(([,original])=>sourceLanguage==='english'?enUI[original.trim()]:original.trim());
+              const response=await fetch('/api/translate-ui',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({language:code,source_language:sourceLanguage,texts:requestTexts})});
+              const data=await response.json();if(!response.ok)throw new Error(data.detail||'Translation failed');
+              group.forEach(([,original],j)=>{const key=code+'\0'+original.trim();localizedCache.set(key,data.translations[j]);try{localStorage.setItem(translationStoragePrefix+key,data.translations[j]);}catch(_e){}});
+            }
+            if(run!==languageRun)return;
+            batch.forEach(([textNode,original])=>{
+              const key=code+'\0'+original.trim(),translated=localizedCache.get(key)||localStorage.getItem(translationStoragePrefix+key);
+              if(translated){const lead=original.match(/^\s*/)[0],tail=original.match(/\s*$/)[0];textNode.nodeValue=lead+translated+tail;}
+            });
+          }
+          select.title='Interface translated';
+        }catch(error){
+          if(run===languageRun){for(const [textNode,original] of originalTextNodes){const trimmed=original.trim();const value=code==='en'?(enUI[trimmed]||trimmed):(offlineLabel(code,trimmed)||enUI[trimmed]||trimmed);const lead=original.match(/^\s*/)[0],tail=original.match(/\s*$/)[0];textNode.nodeValue=lead+value+tail;}select.title='Translation unavailable: '+error.message;}
+        }finally{if(run===languageRun)select.disabled=false;}
+      }
+      langSel.addEventListener('change',()=>applyLanguage(langSel.value));applyLanguage(langSel.value);
+      function drawDesktopAction(ctx,w,h,action,sec){
+        ctx.clearRect(0,0,w,h);const base=112;let x=w/2,y=h*.49,angle=0;
+        if(action==='walk'){x+=Math.sin(sec*2.2)*18;y+=Math.abs(Math.sin(sec*7))*3;angle=Math.sin(sec*7)*.035;}
+        if(action==='jump'){y-=Math.sin((sec%1.25)/1.25*Math.PI)*30;}
+        if(action==='pickup'){const q=(sec%2.8)/2.8;if(q>.22&&q<.66){angle=.10;y+=5;}}
+        if(action==='computer')y-=7+Math.sin(sec*3)*1.5;
+        if(action==='play'){x+=Math.sin(sec*2.5)*5;y-=Math.abs(Math.sin(sec*3))*7;}
+        ctx.fillStyle='rgba(20,18,25,.27)';ctx.beginPath();ctx.ellipse(w/2,h*.86,base*.28*(action==='jump'?.72:1),6,0,0,Math.PI*2);ctx.fill();
+        ctx.save();ctx.translate(x,y);ctx.rotate(angle);ctx.drawImage(baseSpriteCanvas,-base/2,-base/2,base,base);ctx.restore();
+        if(action==='walk'){ctx.fillStyle='#ffebbb';for(let i=0;i<2;i++){const fx=w/2+(i?12:-12)+((sec*34+i*15)%24)-12;ctx.beginPath();ctx.ellipse(fx,h*.855,4,2,0,0,Math.PI*2);ctx.fill();}}
+        if(action==='pickup'){const q=(sec%2.8)/2.8,lift=q>.48?Math.min(1,(q-.48)/.22):0,bx=w/2+35,by=h*.81-lift*31;ctx.strokeStyle='#ffcf8a';ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(w/2+25,h*.66);ctx.quadraticCurveTo(w/2+45,h*.73,bx,by);ctx.stroke();ctx.fillStyle='#f3a64a';ctx.fillRect(bx-9,by-10,18,17);ctx.strokeStyle='#fff1c7';ctx.lineWidth=2;ctx.strokeRect(bx-9,by-10,18,17);ctx.fillStyle='white';ctx.font='12px sans-serif';if(lift>.8)ctx.fillText('拿到了！',bx-22,by-14);}
+        if(action==='computer'){const lx=w/2-31,ly=h*.73;ctx.fillStyle='#202a46';ctx.beginPath();ctx.roundRect(lx,ly,62,35,4);ctx.fill();ctx.fillStyle='#83d9ff';ctx.fillRect(lx+5,ly+5,52,23);ctx.fillStyle='#d8e5ff';ctx.fillRect(lx-5,ly+35,72,5);ctx.fillStyle='#252a39';ctx.fillRect(w/2-22,h*.70,8,10);ctx.fillRect(w/2+14,h*.70,8,10);if(Math.sin(sec*9)>0){ctx.fillStyle='white';ctx.fillRect(lx+12,ly+10,8,2);ctx.fillRect(lx+12,ly+15,15,2);}}
+        if(action==='play'){const bx=w/2+Math.sin(sec*2.5)*48,by=h*.80-Math.abs(Math.sin(sec*3))*32;ctx.fillStyle='#ffce50';ctx.beginPath();ctx.arc(bx,by,9,0,Math.PI*2);ctx.fill();ctx.strokeStyle='white';ctx.lineWidth=2;ctx.beginPath();ctx.arc(bx,by,5,.2,2.7);ctx.stroke();}
+        ctx.font='16px sans-serif';ctx.fillText(({walk:'🚶',jump:'✨',pickup:'📦',computer:'⌨️',play:'🎾'})[action]||'✨',w/2+34,h*.2);
+      }
+
+
+      // --- Main Animation Loop (Studio + Desktop Sandbox) ---
+      let startTime = performance.now();
+      let sandboxX = 62; // percentage
+      let sandboxVx = 0.14;
+
+      function tick(now) {
+        const elapsed = ((now - startTime) / 1000) * state.animSpeed;
+        const phase = elapsed % 1.0;
+
+        if (state.activeView === 'studio') {
+          drawAnimatedSpriteFrame(stageCtx, spriteStageCanvas.width, spriteStageCanvas.height, state.animState, phase, true);
+        } else if (state.activeView === 'desktop') {
+          drawAnimatedSpriteFrame(sandboxCtx,sandboxPetCanvas.width,sandboxPetCanvas.height,state.animState,phase,true);
+          if (state.roamEnabled && !isDraggingPet) {
+            sandboxX += sandboxVx;
+            if (sandboxX > 76 || sandboxX < 8) {
+              sandboxVx = -sandboxVx;
+            }
+            sandboxPetContainer.style.left = sandboxX.toFixed(2) + '%';
+          }
+        }
+
+        requestAnimationFrame(tick);
+      }
+
+      // --- Interactive Focal Anchor Dragging ---
+      const anchorStage = document.getElementById('anchorStage');
+      let activeAnchorKey = null;
+
+      Object.keys(anchorEls).forEach((key) => {
+        const el = anchorEls[key];
+        const startDrag = (e) => {
+          e.preventDefault();
+          activeAnchorKey = key;
+        };
+        el.addEventListener('mousedown', startDrag);
+        el.addEventListener('touchstart', startDrag, { passive: false });
+      });
+
+      function moveAnchor(clientX, clientY) {
+        if (!activeAnchorKey) return;
+        const rect = anchorStage.getBoundingClientRect();
+        const nx = Math.max(0.12, Math.min(0.88, (clientX - rect.left) / rect.width));
+        const ny = Math.max(0.12, Math.min(0.88, (clientY - rect.top) / rect.height));
+        state.anchors[activeAnchorKey] = { x: nx, y: ny };
+        syncAnchorDOM();
+        rebuildBaseSprite();
+      }
+
+      window.addEventListener('mousemove', (e) => {
+        if (activeAnchorKey) moveAnchor(e.clientX, e.clientY);
+      });
+      window.addEventListener('touchmove', (e) => {
+        if (activeAnchorKey && e.touches[0]) moveAnchor(e.touches[0].clientX, e.touches[0].clientY);
+      }, { passive: false });
+      window.addEventListener('mouseup', () => { activeAnchorKey = null; });
+      window.addEventListener('touchend', () => { activeAnchorKey = null; });
+
+      // --- Interactive Desktop Sandbox Pet Dragging ---
+      const sandboxPetContainer = document.getElementById('sandboxPetContainer');
+      const viewDesktop = document.getElementById('viewDesktop');
+      let isDraggingPet = false;
+      let petOffsetX = 0, petOffsetY = 0;
+
+      sandboxPetContainer.addEventListener('mousedown', (e) => {
+        isDraggingPet = true;
+        const rect = sandboxPetContainer.getBoundingClientRect();
+        petOffsetX = e.clientX - rect.left;
+        petOffsetY = e.clientY - rect.top;
+      });
+
+      window.addEventListener('mousemove', (e) => {
+        if (!isDraggingPet) return;
+        const parentRect = viewDesktop.getBoundingClientRect();
+        const nx = ((e.clientX - parentRect.left - petOffsetX) / parentRect.width) * 100;
+        const ny = ((e.clientY - parentRect.top - petOffsetY) / parentRect.height) * 100;
+        sandboxX = Math.max(2, Math.min(82, nx));
+        const clampedY = Math.max(4, Math.min(62, ny));
+        sandboxPetContainer.style.left = sandboxX.toFixed(1) + '%';
+        sandboxPetContainer.style.top = clampedY.toFixed(1) + '%';
+      });
+
+      window.addEventListener('mouseup', () => { isDraggingPet = false; });
+
+      sandboxPetContainer.addEventListener('dblclick', () => {
+        cycleNextAnimState();
+      });
+
+      // --- UI Controls Binding ---
+      function setAnimState(newState) {
+        state.animState = newState;
+        document.querySelectorAll('.state-btn').forEach((btn) => {
+          btn.classList.toggle('active', btn.dataset.state === newState);
+        });
+        const quotes = QUOTES[newState] || QUOTES.idle;
+        const msg = quotes[Math.floor(Math.random() * quotes.length)];
+        document.getElementById('studioBubble').textContent = msg;
+        document.getElementById('sandboxBubble').textContent = msg;
+        document.getElementById('fpsIndicator').textContent = `STATE: ${newState.toUpperCase()} · 60 FPS`;
+      }
+
+      function cycleNextAnimState() {
+        const order = ['idle', 'happy', 'curious', 'grumpy', 'sleepy'];
+        const next = order[(order.indexOf(state.animState) + 1) % order.length];
+        setAnimState(next);
+      }
+
+      spriteStageCanvas.addEventListener('click', cycleNextAnimState);
+      document.getElementById('btnPokePet').addEventListener('click', cycleNextAnimState);
+
+      document.querySelectorAll('.state-btn').forEach((btn) => {
+        btn.addEventListener('click', () => setAnimState(btn.dataset.state));
+      });
+
+      document.querySelectorAll('.view-tab').forEach((tab) => {
+        tab.addEventListener('click', () => {
+          state.activeView = tab.dataset.view;
+          document.querySelectorAll('.view-tab').forEach((t) => t.classList.toggle('active', t === tab));
+          document.getElementById('viewStudio').classList.toggle('hidden', state.activeView !== 'studio');
+          document.getElementById('viewDesktop').classList.toggle('hidden', state.activeView !== 'desktop');
+          document.getElementById('viewSheet').classList.toggle('hidden', state.activeView !== 'sheet');
+          if (state.activeView === 'sheet') renderSpriteSheet();
+        });
+      });
+
+      document.querySelectorAll('.style-card').forEach((card) => {
+        card.addEventListener('click', () => {
+          state.style = card.dataset.style;
+          document.querySelectorAll('.style-card').forEach((c) => c.classList.toggle('active', c === card));
+          const styleNames=langSel.value==='zh'?{big:'夸张大头萌系',weird:'怪诞超现实',geo:'几何立体抽象',grumpy:'俏皮讽刺漫画像',pop:'潮流波普贴纸',pixel:'复古像素桌宠'}:{big:'Exaggerated chibi',weird:'Surreal oddball',geo:'Geometric abstract',grumpy:'Satirical comic',pop:'Pop-art sticker',pixel:'Retro pixel pet'};
+          document.getElementById('chibiMsg').textContent=langSel.value==='zh'?`已选择「${styleNames[state.style]}」，正在按此风格重新生成 3D 萌宠…`:`Selected ${styleNames[state.style]}; regenerating the 3D pet in this style…`;
+          runChibi3d();
+        });
+      });
+
+      // Preset buttons
+      function applyPreset(presetKey) {
+        const cfg = PRESET_CONFIGS[presetKey];
+        if (!cfg) return;
+        state.preset = presetKey;
+        state.style = cfg.style;
+        state.headScale = cfg.headScale;
+        state.eyeScale = cfg.eyeScale;
+        state.accScale = cfg.accScale;
+        state.strength = cfg.strength;
+        state.tolerance = cfg.tolerance;
+        state.anchors = JSON.parse(JSON.stringify(cfg.anchors));
+        state.traits = cfg.traits.slice();
+
+        document.getElementById('petNameInput').value = cfg.name;
+        syncSlidersToState();
+        syncAnchorDOM();
+
+        document.querySelectorAll('.style-card').forEach((c) => {
+          c.classList.toggle('active', c.dataset.style === state.style);
+        });
+        document.querySelectorAll('.preset-btn').forEach((b) => {
+          const on = b.dataset.preset === presetKey;
+          b.className = on
+            ? 'preset-btn shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-[#fff5ee] border border-[#d8653c] text-[#b44b27] transition'
+            : 'preset-btn shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-[#f7f2ec] border border-transparent hover:border-[#d5c6b6] text-[#4c423b] transition';
+        });
+
+        const imgEl = document.getElementById(cfg.imgId);
+        if (imgEl.complete && imgEl.naturalWidth > 0) {
+          loadSourceFromImageElement(imgEl);
+        } else {
+          imgEl.onload = () => loadSourceFromImageElement(imgEl);
+        }
+      }
+
+      document.querySelectorAll('.preset-btn').forEach((btn) => {
+        btn.addEventListener('click', () => applyPreset(btn.dataset.preset));
+      });
+
+      function syncSlidersToState() {
+        document.getElementById('rngHeadScale').value = state.headScale;
+        document.getElementById('valHeadScale').textContent = state.headScale.toFixed(2) + 'x';
+        document.getElementById('rngEyeScale').value = state.eyeScale;
+        document.getElementById('valEyeScale').textContent = state.eyeScale.toFixed(2) + 'x';
+        document.getElementById('rngAccScale').value = state.accScale;
+        document.getElementById('valAccScale').textContent = state.accScale.toFixed(2) + 'x';
+        document.getElementById('rngStrength').value = state.strength;
+        document.getElementById('valStrength').textContent = Math.round(state.strength * 100) + '%';
+        document.getElementById('rngTolerance').value = state.tolerance;
+        document.getElementById('valTolerance').textContent = Math.round(state.tolerance * 100) + '%';
+        document.getElementById('rngOutline').value = state.outlinePx;
+        document.getElementById('valOutline').textContent = state.outlinePx + 'px';
+      }
+
+      // Bind sliders
+      document.getElementById('rngHeadScale').addEventListener('input', (e) => {
+        state.headScale = parseFloat(e.target.value);
+        document.getElementById('valHeadScale').textContent = state.headScale.toFixed(2) + 'x';
+        rebuildBaseSprite();
+      });
+      document.getElementById('rngEyeScale').addEventListener('input', (e) => {
+        state.eyeScale = parseFloat(e.target.value);
+        document.getElementById('valEyeScale').textContent = state.eyeScale.toFixed(2) + 'x';
+        rebuildBaseSprite();
+      });
+      document.getElementById('rngAccScale').addEventListener('input', (e) => {
+        state.accScale = parseFloat(e.target.value);
+        document.getElementById('valAccScale').textContent = state.accScale.toFixed(2) + 'x';
+        rebuildBaseSprite();
+      });
+      document.getElementById('rngStrength').addEventListener('input', (e) => {
+        state.strength = parseFloat(e.target.value);
+        document.getElementById('valStrength').textContent = Math.round(state.strength * 100) + '%';
+        rebuildBaseSprite();
+      });
+      document.getElementById('rngTolerance').addEventListener('input', (e) => {
+        state.tolerance = parseFloat(e.target.value);
+        document.getElementById('valTolerance').textContent = Math.round(state.tolerance * 100) + '%';
+        rebuildBaseSprite();
+      });
+      document.getElementById('rngOutline').addEventListener('input', (e) => {
+        state.outlinePx = parseInt(e.target.value, 10);
+        document.getElementById('valOutline').textContent = state.outlinePx + 'px';
+        rebuildBaseSprite();
+      });
+      document.getElementById('rngAnimSpeed').addEventListener('input', (e) => {
+        state.animSpeed = parseFloat(e.target.value);
+      });
+      document.getElementById('chkShowAnchors').addEventListener('change', (e) => {
+        state.showAnchors = e.target.checked;
+        syncAnchorDOM();
+      });
+
+      document.getElementById('btnAutoFocus').addEventListener('click', () => {
+        analyzeUploadedImageTraits();
+        rebuildBaseSprite();
+        showToast('🎯 已重新定位五官与高饱和配饰焦点！');
+      });
+
+      document.getElementById('btnRandomQuirk').addEventListener('click', () => {
+        const styles = ['big', 'weird', 'geo', 'grumpy', 'pop', 'pixel'];
+        state.style = styles[Math.floor(Math.random() * styles.length)];
+        state.headScale = +(1.30 + Math.random() * 0.55).toFixed(2);
+        state.eyeScale = +(1.35 + Math.random() * 0.65).toFixed(2);
+        state.accScale = +(1.20 + Math.random() * 0.55).toFixed(2);
+        state.strength = +(0.45 + Math.random() * 0.50).toFixed(2);
+        document.querySelectorAll('.style-card').forEach((c) => {
+          c.classList.toggle('active', c.dataset.style === state.style);
+        });
+        syncSlidersToState();
+        rebuildBaseSprite();
+        setAnimState('happy');
+      });
+
+
+      document.getElementById('btnToggleRoam').addEventListener('click', (e) => {
+        state.roamEnabled = !state.roamEnabled;
+        e.currentTarget.textContent = state.roamEnabled ? '🚶 自由巡游：开启中' : '📌 自由巡游：已固定';
+      });
+
+      // --- File Upload Handling ---
+      const fileInput = document.getElementById('fileInput');
+      function handleFileUpload(file) {
+        if (!file || !file.type.startsWith('image/')) {
+          document.getElementById('statusMsg').textContent = '请上传有效的图片文件 (PNG/JPG/WEBP)。';
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = (ev) => {
+          const img = new Image();
+          img.onload = () => {
+            loadSourceFromImageElement(img);
+            analyzeUploadedImageTraits();
+            document.getElementById('petNameInput').value = file.name.replace(/\.[^.]+$/, '').slice(0, 10) || '自定义精灵';
+            showToast('✨ 图片已上传，点击「生成 3D 萌宠」开始 AI 分析与重绘。');
+          };
+          img.src = ev.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) handleFileUpload(e.target.files[0]);
+      });
+
+      const dropZone = document.getElementById('dropZone');
+      dropZone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropZone.classList.add('border-[#d8653c]');
+      });
+      dropZone.addEventListener('dragleave', () => {
+        dropZone.classList.remove('border-[#d8653c]');
+      });
+      dropZone.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('border-[#d8653c]');
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          handleFileUpload(e.dataTransfer.files[0]);
+        }
+      });
+
+      // --- Backend API Integration (/api/status, /api/generate, /api/launch-pet) ---
+      const apiModal=document.getElementById('apiSettingsModal');
+      document.getElementById('btnApiSettings').addEventListener('click',async()=>{
+        apiModal.classList.remove('hidden');apiModal.classList.add('flex');
+        const status=document.getElementById('apiSettingsStatus');status.textContent='正在读取本机 API 配置…';
+        try{const r=await fetch('/api/settings/ai');const d=await r.json();document.getElementById('apiAccountId').value=d.account_id||'';document.getElementById('apiVisionModel').value=d.vision_model||'@cf/moondream/moondream3.1-9B-A2B';document.getElementById('apiImageModel').value=d.image_model||'@cf/black-forest-labs/flux-1-schnell';document.getElementById('apiVideoModel').value=d.video_model||'pixverse/v6';status.textContent=d.configured?'接口已配置。API Token 已隐藏，留空可保留现有令牌。':'尚未配置，请填写 Account ID 和 API Token。';}catch(e){status.textContent='无法读取本机服务设置：'+e.message;}
+      });
+      document.getElementById('btnApiClose').addEventListener('click',()=>{apiModal.classList.add('hidden');apiModal.classList.remove('flex');});
+      document.getElementById('btnApiSave').addEventListener('click',async()=>{
+        const status=document.getElementById('apiSettingsStatus'),button=document.getElementById('btnApiSave');button.disabled=true;status.textContent='正在安全保存到本机 .env…';
+        try{const r=await fetch('/api/settings/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account_id:document.getElementById('apiAccountId').value,api_token:document.getElementById('apiToken').value,vision_model:document.getElementById('apiVisionModel').value,image_model:document.getElementById('apiImageModel').value,video_model:document.getElementById('apiVideoModel').value})});const d=await r.json();if(!r.ok)throw new Error(d.detail||'保存失败');document.getElementById('apiToken').value='';status.textContent='✅ 已保存。令牌已隐藏，可点击「测试接口」验证视觉模型。';checkBackendStatus();}catch(e){status.textContent='❌ '+e.message;}finally{button.disabled=false;}
+      });
+      document.getElementById('btnApiTest').addEventListener('click',async()=>{
+        const status=document.getElementById('apiSettingsStatus'),button=document.getElementById('btnApiTest');button.disabled=true;status.textContent='正在保存当前配置并调用视觉模型…';
+        try{const save=await fetch('/api/settings/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account_id:document.getElementById('apiAccountId').value,api_token:document.getElementById('apiToken').value,vision_model:document.getElementById('apiVisionModel').value,image_model:document.getElementById('apiImageModel').value,video_model:document.getElementById('apiVideoModel').value})});const sd=await save.json();if(!save.ok)throw new Error(sd.detail||'配置保存失败');document.getElementById('apiToken').value='';const r=await fetch('/api/settings/ai/test',{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(d.detail||'接口测试失败');status.textContent='✅ '+d.message+'（'+d.model+'）';checkBackendStatus();}catch(e){status.textContent='❌ '+e.message;}finally{button.disabled=false;}
+      });
+
+      async function checkBackendStatus() {
+        try {
+          const res = await fetch('/api/status');
+          if (!res.ok) return;
+          const data = await res.json();
+          state.backendReady = Boolean(data.ready);
+          state.backendEngine = data.engine || 'procedural-abstract-v2';
+          document.getElementById('backendDot').className = 'w-2 h-2 rounded-full bg-emerald-500';
+          document.getElementById('backendText').textContent = (langSel.value==='zh' ? `本机服务已连接 · 引擎: ${state.backendEngine} (${data.device || 'cpu'})` : `Local service connected · ${state.backendEngine} (${data.device || 'cpu'})`);
+          const cb = document.getElementById('comfyBadge');
+          const cf = data.comfy || {};
+          if (data.provider === 'cloudflare') {
+            const ready = Boolean(data.cloudflare_configured);
+            document.getElementById('backendDot').className = 'w-2 h-2 rounded-full ' + (ready ? 'bg-emerald-500' : 'bg-amber-500');
+            document.getElementById('backendText').textContent = ready ? (langSel.value==='zh'?'Cloudflare 云端 AI 已配置 · 先分析特点，再全新生成卡通形象':'Cloudflare AI connected · analyze traits, then generate a new character') : (langSel.value==='zh'?'Cloudflare 尚未配置 · 请填写本机 .env 文件':'Cloudflare is not configured · open AI API settings');
+            cb.textContent = ready ? (langSel.value==='zh'?'Cloudflare AI：已配置 · Vision + FLUX':'Cloudflare AI: ready · Vision + FLUX') : (langSel.value==='zh'?'Cloudflare AI：待配置 Account ID / API Token':'Cloudflare AI: add Account ID / API Token');
+            cb.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full ' + (ready ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800');
+          } else {
+            if (cf.online) {
+            cb.textContent = cf.ipadapter_ready ? `ComfyUI 已连接 · IP-Adapter ✓` : `ComfyUI 已连接 · 缺 IP-Adapter（将退化为 img2img）`;
+            cb.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full ' + (cf.ipadapter_ready ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800');
+          } else {
+            cb.textContent = 'ComfyUI 未连接（请先启动）';
+            cb.className = 'text-[10px] font-semibold px-2 py-0.5 rounded-full bg-rose-100 text-rose-800';
+          }
+          }
+        } catch (_err) {
+          // Running standalone in Canvas or static file mode
+        }
+      }
+
+
+
+      // --- 3D 萌宠重生成 (POST /api/chibi3d → 本机 ComfyUI) ---
+      const simRange = document.getElementById('rngSimilarity');
+      simRange.addEventListener('input', () => {
+        document.getElementById('valSimilarity').textContent = Number(simRange.value).toFixed(2);
+      });
+
+      async function runChibi3d() {
+        const msg = document.getElementById('chibiMsg');
+        const btn = document.getElementById('btnChibi3d');
+        const reroll = document.getElementById('btnChibiReroll');
+        const traitsText = document.getElementById('inpTraits').value.trim() || (state.traits || []).join('、');
+        if (btn.disabled) return;
+        btn.disabled = true; reroll.disabled = true;
+        document.querySelectorAll('.style-card').forEach((c) => { c.disabled = true; c.classList.add('opacity-60','cursor-wait'); });
+        const selectedName = document.querySelector(`.style-card[data-style="${state.style}"]`)?.innerText.trim().split('\n')[0] || state.style;
+        const btnLabel=btn.textContent; btn.textContent=`⏳ 生成中：${selectedName}`;
+        const t0 = Date.now();
+        const timer = setInterval(() => {
+          const activeProvider = document.getElementById('comfyBadge').textContent.includes('Cloudflare') ? 'Cloudflare AI' : 'ComfyUI';
+          msg.textContent = '⏳ 正在让 ' + activeProvider + ' 分析特点并重绘 3D 形象… 已用时 ' + Math.round((Date.now() - t0) / 1000) + ' 秒';
+        }, 500);
+        try {
+          const blob = await new Promise((resolve) => sourceCanvas.toBlob(resolve, 'image/png'));
+          const fd = new FormData();
+          fd.append('image', blob, 'source.png');
+          fd.append('traits', traitsText);
+          fd.append('subject', document.getElementById('selSubject').value);
+          fd.append('texture', document.getElementById('selTexture').value);
+          fd.append('style', state.style);
+          fd.append('similarity', simRange.value);
+          fd.append('seed', '-1');
+          fd.append('outline_px', String(Math.min(12, state.outlinePx)));
+          const res = await fetch('/api/chibi3d', { method: 'POST', body: fd });
+          const payload = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(payload.detail || `生成失败 (HTTP ${res.status})`);
+
+          await new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => {
+              baseSpriteCtx.clearRect(0, 0, 256, 256);
+              const k = Math.min(256 / img.width, 256 / img.height);
+              const w = img.width * k, h = img.height * k;
+              baseSpriteCtx.imageSmoothingQuality = 'high';
+              baseSpriteCtx.drawImage(img, (256 - w) / 2, (256 - h) / 2, w, h);
+              state.customSprite = true;
+              state.customSpriteUrl = payload.image;
+              state.aiMotionUrl = null; state.aiMotionFile = null;
+              document.getElementById('aiMotionStage').classList.add('hidden');
+              document.getElementById('aiMotionSandbox').classList.add('hidden');
+              spriteStageCanvas.classList.remove('hidden'); sandboxPetCanvas.classList.remove('hidden');
+              document.getElementById('sandboxActionName').textContent=langSel.value==='zh'?'待生成 AI 动作':'Generate an AI action first';
+              renderSpriteSheet();
+              resolve();
+            };
+            img.onerror = () => reject(new Error('生成结果无法解码'));
+            img.src = payload.image;
+          });
+          const warn = (payload.warnings || []).map((w) => '⚠ ' + w).join(' ');
+          msg.textContent = `✅「${selectedName}」风格已重新生成（${payload.engine}）。${warn}`;
+          showToast('🧸 3D 萌宠生成完毕，已同步到精灵舞台！');
+        } catch (err) {
+          msg.textContent = '❌ ' + (err && err.message ? err.message : err) +
+            (String(err).includes('Failed to fetch') ? '（本机服务 server.py 未启动，请双击 start-windows.bat）' : '');
+        } finally {
+          clearInterval(timer);
+          btn.disabled = false; reroll.disabled = false; btn.textContent=btnLabel;
+          document.querySelectorAll('.style-card').forEach((c) => { c.disabled = false; c.classList.remove('opacity-60','cursor-wait'); });
+        }
+      }
+      const motionNames=langSel.value==='zh'?{walk:'来回走动',jump:'蹦蹦跳跳',pickup:'弯腰拿取物品',computer:'坐下使用电脑',play:'追球玩耍'}:{walk:'Walk around',jump:'Jump',pickup:'Pick up an item',computer:'Use a computer',play:'Play with a ball'};
+      document.getElementById('btnAiMotion').addEventListener('click',async()=>{
+        if(!state.customSpriteUrl){document.getElementById('chibiMsg').textContent='先生成一个 3D 萌宠，再生成 AI 全身动作。';return;}
+        const action=document.getElementById('selMotionAction').value,button=document.getElementById('btnAiMotion'),msg=document.getElementById('chibiMsg');
+        button.disabled=true;button.textContent='⏳ '+(langSel.value==='zh'?'AI 正在生成角色动作…':'Generating AI character motion…');msg.textContent=langSel.value==='zh'?`正在生成「${motionNames[action]}」3 秒动作；同一只精灵的同一动作会从本机缓存读取。`:`Generating a 3-second ${motionNames[action]} clip. Repeats for the same pet and action use the local cache.`;
+        try{const fd=new FormData();fd.append('sprite_data',baseSpriteCanvas.toDataURL('image/png'));fd.append('action',action);fd.append('expression',document.getElementById('selMotionExpression').value);const r=await fetch('/api/animate-pet',{method:'POST',body:fd});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.detail||`动作生成失败 (HTTP ${r.status})`);state.aiMotionUrl=d.animation_url;state.aiMotionFile=d.animation_file;document.getElementById('aiMotionStage').src=d.animation_url;document.getElementById('aiMotionSandbox').src=d.animation_url;document.getElementById('aiMotionStage').classList.remove('hidden');document.getElementById('aiMotionSandbox').classList.remove('hidden');spriteStageCanvas.classList.add('hidden');sandboxPetCanvas.classList.add('hidden');document.getElementById('sandboxActionName').textContent=motionNames[action]+' · AI循环';msg.textContent=langSel.value==='zh'?`✅ 已生成「${motionNames[action]}」AI 全身动作，带动态表情${d.cached?'（本机缓存）':''}。召唤到桌面即可播放。`:`✅ AI full-body ${motionNames[action]} animation with facial expressions is ready${d.cached?' (cached)':''}. Summon the pet to play it on the desktop.`;}
+        catch(e){msg.textContent='❌ '+e.message;}
+        finally{button.disabled=false;button.textContent=langSel.value==='zh'?'🎬 生成 3 秒 AI 动作（约 $0.08）':'🎬 Generate 3s AI motion (~$0.08)';}
+      });
+
+      document.getElementById('btnChibi3d').addEventListener('click', runChibi3d);
+      document.getElementById('btnChibiReroll').addEventListener('click', runChibi3d);
+
+
+      // --- Summon to Windows Desktop Pet ---
+      const petModal = document.getElementById('petModal');
+      const modalBody = document.getElementById('modalBody');
+
+      document.getElementById('btnSummonPet').addEventListener('click', async () => {
+        const petName = document.getElementById('petNameInput').value || '抽象小精灵';
+        if (!state.customSpriteUrl) { showToast('请先通过 AI 生成 3D 萌宠，再召唤到桌面。'); return; }
+        const dataUrl = state.customSpriteUrl;
+
+        try {
+          const fd = new FormData();
+          fd.append('sprite_data', dataUrl);
+          fd.append('pet_name', petName);
+          fd.append('scale', '1.0');
+          if (state.aiMotionFile) fd.append('animation_file', state.aiMotionFile);
+          const res = await fetch('/api/launch-pet', { method: 'POST', body: fd });
+          if (res.ok) {
+            const info = await res.json();
+            showToast(`🚀 已在你的 Windows 桌面启动置顶精灵「${info.name}」(PID: ${info.pid})！`);
+            return;
+          }
+        } catch (_e) {
+          // Show local guide modal when previewing inside browser sandbox
+        }
+
+        modalBody.innerHTML = `
+          <p class="font-bold text-[#2b2522]">当前精灵「${petName}」已准备就绪！</p>
+          <p>若要在你的 Windows 电脑桌面召唤真正的<b>无边框全透明置顶桌宠</b>，只需两步：</p>
+          <ol class="list-decimal pl-5 space-y-1.5">
+            <li>将完善后的工程解压到你的目录：<br><code class="bg-[#f5efe6] px-1.5 py-0.5 rounded text-[11px] break-all">本机项目目录</code></li>
+            <li>双击运行 <code class="bg-[#f5efe6] px-1.5 py-0.5 rounded font-bold">start-windows.bat</code> 启动本机服务后点击此按钮，或者将下方导出的 <code class="bg-[#f5efe6] px-1.5 py-0.5 rounded">latest_sprite.png</code> 放入 <code class="bg-[#f5efe6] px-1.5 py-0.5 rounded">saved_sprites/</code> 文件夹并双击 <code class="bg-[#f5efe6] px-1.5 py-0.5 rounded font-bold">launch-pet.bat</code>！</li>
+          </ol>
+          <p class="text-[#9c4d36] font-medium">💡 你也可以点击上方「🖥️ Windows 桌面模拟沙盒」标签页，直接在网页内体验拖拽与桌宠巡游效果。</p>
+        `;
+        petModal.classList.remove('hidden');
+      });
+
+      document.getElementById('btnCloseModal').addEventListener('click', () => petModal.classList.add('hidden'));
+      document.getElementById('btnModalOk').addEventListener('click', () => petModal.classList.add('hidden'));
+      document.getElementById('btnModalDownloadPng').addEventListener('click', () => {
+        if (!state.customSpriteUrl) { showToast('请先通过 AI 生成 3D 萌宠。'); return; }
+        downloadDataUrl(state.customSpriteUrl, 'latest_sprite.png');
+        petModal.classList.add('hidden');
+      });
+
+      // --- Export Actions ---
+      function downloadDataUrl(url, filename) {
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+        showToast(`✅ 已导出 ${filename}`);
+      }
+
+      function showToast(msg) {
+        const el = document.getElementById('exportToast');
+        el.textContent = msg;
+        setTimeout(() => {
+          if (el.textContent === msg) el.textContent = '';
+        }, 4000);
+      }
+
+      document.getElementById('btnDownloadSingle').addEventListener('click', () => {
+        const name = (document.getElementById('petNameInput').value || 'sprite').trim();
+        if (!state.customSpriteUrl) { showToast('请先通过 AI 生成 3D 萌宠。'); return; }
+        downloadDataUrl(state.customSpriteUrl, `${name}-sprite.png`);
+      });
+
+      document.getElementById('btnDownloadSheet').addEventListener('click', () => {
+        renderSpriteSheet();
+        const name = (document.getElementById('petNameInput').value || 'sprite').trim();
+        downloadDataUrl(spriteSheetCanvas.toDataURL('image/png'), `${name}-spritesheet-5x4.png`);
+      });
+
+      document.getElementById('btnDownloadJson').addEventListener('click', () => {
+        const name = (document.getElementById('petNameInput').value || 'sprite').trim();
+        const manifest = {
+          name: name,
+          generator: 'Abstract Desktop Sprite Studio v2.0',
+          style: state.style,
+          feature_magnification: {
+            head_scale: state.headScale,
+            eye_scale: state.eyeScale,
+            accessory_scale: state.accScale,
+            abstract_strength: state.strength,
+            anchors: state.anchors
+          },
+          sprite_sheet: {
+            columns: 4,
+            rows: 5,
+            frame_width: 160,
+            frame_height: 160,
+            animations: {
+              idle: { row: 0, frames: 4, fps: 8, loop: true },
+              happy: { row: 1, frames: 4, fps: 12, loop: true },
+              curious: { row: 2, frames: 4, fps: 8, loop: true },
+              grumpy: { row: 3, frames: 4, fps: 15, loop: true },
+              sleepy: { row: 4, frames: 4, fps: 5, loop: true }
+            }
+          }
+        };
+        const blob = new Blob([JSON.stringify(manifest, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        downloadDataUrl(url, `${name}-manifest.json`);
+      });
+
+      // --- Initialize ---
+      window.addEventListener('load', () => {
+        state.customSprite = true;
+        applyPreset('dev');
+        const starter = new Image();
+        starter.onload = () => { baseSpriteCtx.clearRect(0,0,256,256); const k=Math.min(256/starter.width,256/starter.height); const w=starter.width*k,h=starter.height*k; baseSpriteCtx.drawImage(starter,(256-w)/2,(256-h)/2,w,h); state.customSpriteUrl='/saved_sprites/latest_sprite.png'; renderSpriteSheet(); };
+        starter.onerror = () => { document.getElementById('chibiMsg').textContent='上传图片并连接 AI 接口后，即可生成你的专属 3D 萌宠。'; };
+        starter.src='/saved_sprites/latest_sprite.png';
+        checkBackendStatus();
+        requestAnimationFrame(tick);
+      });
+    })();
+  </script>
+<script>
+    (async function publicAccessPrompt(){
+      try {
+        const status = await fetch('/api/status');
+        if (status.status !== 401) return;
+        const code = prompt('桌面 AI 精灵测试版需要访问口令：');
+        if (!code) return;
+        const verified = await fetch('/api/access/verify', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({code})});
+        if (verified.ok) location.reload();
+        else alert('访问口令不正确，请联系测试版提供者。');
+      } catch (_) {}
+    })();
+  </script>
+</body>
+</html>
+
