@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: desktop-ai-sprite
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /
+    envVars:
+      - key: PUBLIC_HOSTED_MODE
+        value: "true"
+      - key: APP_ACCESS_CODE
+        sync: false
+      - key: AI_PROVIDER
+        value: cloudflare
+      - key: CLOUDFLARE_ACCOUNT_ID
+        sync: false
+      - key: CLOUDFLARE_API_TOKEN
+        sync: false
+      - key: CLOUDFLARE_VISION_MODEL
+        value: "@cf/moondream/moondream3.1-9B-A2B"
+      - key: CLOUDFLARE_IMAGE_MODEL
+        value: "@cf/black-forest-labs/flux-2-klein-9b"
+
