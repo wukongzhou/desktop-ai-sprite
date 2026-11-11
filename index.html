@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 30299)
-Total output lines: 1886
-
 <!doctype html>
 <html lang="zh-CN">
 <head>
@@ -106,8 +103,9 @@ Total output lines: 1886
   <!-- Hidden Sample Images (Inlined as Base64 for instant offline/Canvas use) -->
   <div class="hidden" aria-hidden="true">
 
-    <img id="presetImgCat" src="" alt="领结喵星人">
-    <img id="presetImgArtist" src="" alt="贝雷帽画师">
+    <img id="presetImgCat" src="/assets/demo-cat.webp" alt="领结喵星人">
+    <img id="presetImgArtist" src="/assets/demo-person.webp" alt="贝雷帽画师">
+<img id="presetImgComic" src="/assets/demo-comic.webp" alt="水彩漫画示例" hidden />
   </div>
 
   <!-- Main Workspace -->
@@ -135,9 +133,9 @@ Total output lines: 1886
             <span>🐱</span><span>领结傲娇喵</span>
           </button>
           <button type="button" data-preset="artist" class="preset-btn shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-[#f7f2ec] border border-transparent hover:border-[#d5c6b6] text-[#4c423b] transition">
-            <span>🎨</span><span>贝雷帽卷发</span>
+            <span>🧑</span><span>真人感肖像</span>
           </button>
-        </div>
+                  <button type="button" data-preset="comic" class="preset-btn shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-[#f7f2ec] border border-transparent hover:border-[#d5c6b6] text-[#4c423b] transition"><span>🎨</span><span>水彩漫画</span></button>
 
         <!-- Source Preview + Draggable Focal Points + Upload Dropzone -->
         <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
@@ -635,7 +633,7 @@ Total output lines: 1886
         },
         artist: {
           imgId: 'presetImgArtist',
-          name: '贝雷帽画师',
+          name: '真人感男生',
           style: 'pop',
           headScale: 1.46,
           eyeScale: 1.58,
@@ -648,8 +646,9 @@ Total output lines: 1886
             mouth: { x: 0.50, y: 0.56 },
             accessory: { x: 0.52, y: 0.20 }
           },
-          traits: ['明黄画家贝雷帽 ×1.50', '蓬松蓝黑大卷发', '灵动高光大眼 ×1.58', '暖橘元气腮红']
-        }
+          traits: ['黑色蓬松短发', '耳环与项链配饰', '黑色街头卫衣', '自然沉稳神态']
+        },
+        comic: { imgId: 'presetImgComic', name: '水彩漫画少女', style: 'weird', headScale: 1.55, eyeScale: 1.75, accScale: 1.35, strength: 0.73, tolerance: 0.2, anchors: { leftEye:{x:0.39,y:0.37}, rightEye:{x:0.61,y:0.37}, mouth:{x:0.5,y:0.49}, accessory:{x:0.5,y:0.75} }, traits:['水彩纸张质感','棕色双马尾','明亮大眼','蓝黄撞色外套'] }
       };
 
       const QUOTES = {
@@ -1115,7 +1114,39 @@ Total output lines: 1886
         ctx.beginPath();
         ctx.ellipse(cw / 2 + pose.dx, shadowY, shadowRx, 9, 0, 0, Math.PI * 2);
         ctx.fill();
-        …299 tokens truncated…          subCanvas.height = cellH;
+        ctx.restore();
+
+        // Transformed sprite
+        ctx.save();
+        ctx.translate(cw / 2 + pose.dx, ch * 0.52 + pose.dy);
+        ctx.rotate(pose.angle);
+        ctx.scale(pose.sx, pose.sy);
+        ctx.drawImage(baseSpriteCanvas, -baseSize / 2, -baseSize / 2, baseSize, baseSize);
+
+        if (drawEmote) {
+          ctx.font = `${Math.round(baseSize * 0.14)}px sans-serif`;
+          ctx.fillText(pose.emote, baseSize * 0.28, -baseSize * 0.30);
+        }
+        ctx.restore();
+      }
+
+      // --- Render 5x4 Sprite Sheet Canvas ---
+      function renderSpriteSheet() {
+        const states = ['idle', 'happy', 'curious', 'grumpy', 'sleepy'];
+        const cols = 4;
+        const rows = states.length;
+        const cellW = spriteSheetCanvas.width / cols;
+        const cellH = spriteSheetCanvas.height / rows;
+
+        sheetCtx.clearRect(0, 0, spriteSheetCanvas.width, spriteSheetCanvas.height);
+
+        for (let r = 0; r < rows; r++) {
+          const st = states[r];
+          for (let c = 0; c < cols; c++) {
+            const phase = c / cols;
+            const subCanvas = document.createElement('canvas');
+            subCanvas.width = cellW;
+            subCanvas.height = cellH;
             const subCtx = subCanvas.getContext('2d');
             drawAnimatedSpriteFrame(subCtx, cellW, cellH, st, phase, true);
             sheetCtx.drawImage(subCanvas, c * cellW, r * cellH);
@@ -1134,7 +1165,7 @@ Total output lines: 1886
       const langs=[['en','English'],['zh','简体中文'],['es','Español'],['hi','हिन्दी'],['ar','العربية'],['bn','বাংলা'],['pt','Português'],['ru','Русский'],['ja','日本語'],['pa','ਪੰਜਾਬੀ'],['de','Deutsch'],['fr','Français'],['ko','한국어'],['vi','Tiếng Việt'],['it','Italiano'],['tr','Türkçe'],['fa','فارسی'],['sw','Kiswahili'],['th','ไทย'],['jv','Basa Jawa'],['mr','मराठी'],['te','తెలుగు'],['ta','தமிழ்'],['ur','اردو'],['gu','ગુજરાતી'],['pl','Polski'],['uk','Українська'],['nl','Nederlands'],['id','Bahasa Indonesia'],['ms','Bahasa Melayu']];
       const langSel=document.getElementById('languageSelect');
       langs.forEach(([v,n])=>{const o=document.createElement('option');o.value=v;o.textContent=n;langSel.appendChild(o)});
-      langSel.value=localStorage.getItem('desktopPetLanguage')||'en';
+      const savedLang=localStorage.getItem('desktopPetLanguage')||'en';langSel.value=langs.some(([v])=>v===savedLang)?savedLang:'en';
       const enUI={
         '抽象桌面精灵工坊 · Cartoon Sprite Studio':'Desktop AI Pet Studio · Cartoon Sprite Studio','抽象桌面精灵工坊':'Desktop AI Pet Studio',
         '上传一张图 → 自动提取主体 → 非线性放大五官/神态特点 → 生成多状态透明桌面精灵':'Upload an image → extract its distinctive traits → generate a multi-action 3D desktop pet',
@@ -1854,4 +1885,3 @@ Total output lines: 1886
   </script>
 </body>
 </html>
-
