@@ -48,3 +48,9 @@ Desktop Sprite {PET_NAME} · Installation Manual
 - 吃 = 移进回收站，可恢复；大文件、吃撑了会先问你。/ Eating = move to Recycle Bin (recoverable); it asks first for big files and refuses when full.
 - 能修的：图片重新编码、zip 抢救、文本转码；修不好它会委屈脸认栽。/ It can fix: image re-encode, ZIP salvage, text re-encode. If it can't, it admits it with a sad face.
 - 拖放需要 tkinterdnd2：第一次启动会自动装（装不上也不影响，右键菜单一样能用）。/ Drag-and-drop needs tkinterdnd2 (auto-installed on first launch; the right-click menu works without it).
+
+九、随机情绪 + 主人互动 | Mood & Play
+- 它会随机换情绪（开心、无聊、委屈、兴奋、犯困、傲娇），每半分钟到一分钟换一个；情绪会改它的行为和说话，性格卡上能看到它现在什么情绪。/ It changes mood every half minute or so (happy, bored, sad, excited, sleepy, tsundere); mood changes its behavior and bubbles, and the profile card shows the current mood.
+- 鼠标一分钟没动，它自己走过来问“主人，你在干嘛呀？”/ If you leave the mouse alone for a minute, it walks over and asks what you're up to.
+- 右键菜单：摸摸头（它超开心）、陪它玩一会儿、问问它在想什么。/ Right-click menu: pat its head, play with it, ask what it's thinking.
+- 戳它的反应看它现在什么情绪：委屈时戳它更委屈，开心时戳它更兴奋。/ How it reacts to pokes depends on its mood: poking it while sad makes it sadder, while happy makes it more excited.

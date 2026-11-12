@@ -1,4 +1,4 @@
-"""desktop_pet.py v3.2 — 拟人化桌宠（阶段二：吃文件 + 修文件）。
+"""desktop_pet.py v3.3 — 拟人化桌宠（阶段二补丁：随机情绪 + 主人互动）。
 
 在 v2 的透明窗、拖拽、右键菜单、AI 动作循环基础上，接上 pet_brain：
 精灵自己随机动（走、跳、睡、发呆、凑近鼠标、假装忙……），心情值涨跌，
@@ -169,6 +169,8 @@ class DesktopSpriteApp:
         self._repair_started = 0.0
         self._menu_eat_label = "🍽️ 吃掉这个文件"
         self._menu_fix_label = "🔧 修修这个文件"
+        self._last_pointer = (0, 0)
+        self._pointer_idle_since = time.monotonic()
 
         self.bubble_text = f"嗨！我是{self.name} ✨"
         self.bubble_timer = 110
@@ -228,6 +230,9 @@ class DesktopSpriteApp:
         self.menu.add_command(label="🚶 切换桌面自由巡游", command=self.toggle_roam)
         self.menu.add_separator()
         self.menu.add_command(label="💛 哄它一下", command=self._cheer)
+        self.menu.add_command(label="🤲 摸摸头", command=self._pet_head)
+        self.menu.add_command(label="⚽ 陪它玩一会儿", command=self._play_with)
+        self.menu.add_command(label="💬 问问它在想什么", command=self._ask_it)
         self.menu.add_command(label="💤 睡觉 / 叫醒", command=self._toggle_sleep)
         self.menu.add_command(label="🪪 看看性格卡", command=self._show_profile)
         self.menu.add_command(label="🎲 换个性格（重掷）", command=self._reroll)
@@ -258,6 +263,22 @@ class DesktopSpriteApp:
     def _cheer(self) -> None:
         self.bubble_text = self.brain.on_cheer()
         self.bubble_timer = 110
+
+    # ---------------------------------------------------------- 主人互动
+    def _pet_head(self) -> None:
+        _bid, text = self.brain.on_pet()
+        self.bubble_text = text
+        self.bubble_timer = 140
+
+    def _play_with(self) -> None:
+        _bid, text = self.brain.on_play()
+        self.bubble_text = text
+        self.bubble_timer = 140
+
+    def _ask_it(self) -> None:
+        self.bubble_text = self.brain.on_ask()
+        self.bubble_timer = 200
+
 
     def _toggle_sleep(self) -> None:
         _bid, text = self.brain.on_wake_toggle()
@@ -601,6 +622,25 @@ class DesktopSpriteApp:
         if changed:
             self.bubble_text = self.brain.bubble_for(self.brain.current)
             self.bubble_timer = 110
+        if self.brain.emotion_changed:
+            self.brain.emotion_changed = False
+            self.bubble_text = self.brain.emotion_line()
+            self.bubble_timer = 110
+        # 鼠标 60 秒没动：它自己凑过来问你在干嘛
+        try:
+            px, py = self.root.winfo_pointerx(), self.root.winfo_pointery()
+        except Exception:
+            px, py = self._last_pointer
+        if (px, py) != self._last_pointer:
+            self._last_pointer = (px, py)
+            self._pointer_idle_since = time.monotonic()
+        elif (time.monotonic() - self._pointer_idle_since > 60
+              and self.brain.current not in ("sleep", "overstuffed")
+              and not self.brain.pending_meal and not self._pending_file):
+            self._pointer_idle_since = time.monotonic()
+            self.brain.force("curious_approach")
+            self.bubble_text = "主人，你在干嘛呀？"
+            self.bubble_timer = 160
         self.state = RENDER_STATE.get(self.brain.current, "idle")
 
         # Compute squash/stretch, bounce, and tilt by state

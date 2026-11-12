@@ -96,6 +96,18 @@ LINES = {
     "dazed": ["（晕乎乎）转得我头都晕了……", "哎哟，轻点放我下来嘛。"],
     "cheered": ["嘿嘿，被哄开心啦！", "（蹭蹭）再哄一下嘛～"],
     "thought": ["我在想，云是什么味道的。", "如果文件有味道，.jpg 应该是草莓味。", "主人今天心情怎么样呢？", "等会儿要不要去屏幕那头看看。"],
+    "petted": ["（舒服得眯起眼睛）", "嘿嘿，再摸一下嘛～", "（蹭蹭你的手）"],
+    "ask_owner": ["主人，你今天心情怎么样？", "等会儿带我去屏幕那头看看好不好？", "你最喜欢吃什么呀？", "今天有什么好玩的事吗？"],
+}
+
+# ---------------------------------------------------------------- 情绪文案
+EMOTION_LINES = {
+    "happy": ["今天心情超好！", "（哼着小曲）啦啦啦～", "阳光真好呀！"],
+    "bored": ["好无聊啊……主人陪我玩嘛。", "（数手指）1、2、3……", "没什么好玩的吗……"],
+    "sad": ["（耷拉着耳朵）呜……", "有点委屈，但是说不出来……", "主人是不是不喜欢我了……"],
+    "excited": ["好耶好耶！", "（原地转圈）太兴奋啦！", "今天一定有好事发生！"],
+    "sleepy": ["（打哈欠）好困……", "眼皮在打架……", "让我眯一小会儿……"],
+    "tsundere": ["哼，我才没有想你。", "（别过头）看什么看！", "才、才不是特意来看你的！"],
 }
 
 TSUNDERE_LINES = {
@@ -129,6 +141,18 @@ FULLNESS_REFUSE = 90
 def fullness_gain(size: int) -> int:
     """吃一口涨多少饱腹：小零食 +5，大餐最多 +40。"""
     return 5 + min(35, size // (10 * 1024 * 1024))
+
+
+EMOTIONS = {
+    "happy":    {"weight": 3, "duration": (25.0, 60.0)},  # 开心
+    "bored":    {"weight": 2, "duration": (25.0, 50.0)},  # 无聊
+    "sad":      {"weight": 2, "duration": (25.0, 40.0)},  # 委屈
+    "excited":  {"weight": 2, "duration": (25.0, 40.0)},  # 兴奋
+    "sleepy":   {"weight": 2, "duration": (25.0, 50.0)},  # 犯困
+    "tsundere": {"weight": 2, "duration": (25.0, 40.0)},  # 傲娇
+}
+EMOTION_LABELS = {"happy": "开心", "bored": "无聊", "sad": "委屈",
+                  "excited": "兴奋", "sleepy": "犯困", "tsundere": "傲娇"}
 
 
 # ---------------------------------------------------------------- 行为表
@@ -177,7 +201,8 @@ class Brain:
         self.curiosity = 50.0
         # 统计
         self.stats = {"pokes": 0, "pets": 0, "drags": 0, "wake_ups": 0,
-                      "meals": 0, "repairs_ok": 0, "repairs_fail": 0}
+                      "meals": 0, "repairs_ok": 0, "repairs_fail": 0,
+                      "head_pats": 0}
         # 行为状态
         self.current = "idle_look"
         self.behavior_t = 0.0
@@ -186,6 +211,10 @@ class Brain:
         self._pokes_window: list[float] = []  # 最近戳击的时间戳（防暴躁）
         self.pending_meal: dict | None = None  # 回收站大件：等主人点头才吃
         self.pending_meal_at = 0.0
+        self.emotion = self._roll_emotion()
+        self.emotion_t = 0.0
+        self.emotion_duration = self.rng.uniform(*EMOTIONS[self.emotion]["duration"])
+        self.emotion_changed = False
         self._last_sleep = False
 
     # ---------------------------------------------------------- 权重
@@ -233,6 +262,32 @@ class Brain:
                 w *= 0
         if bid == "ai_motion" and not self.has_ai_motion:
             return 0.0
+        # 情绪修正
+        e = self.emotion
+        if e == "happy" and bid in ("dance", "excited"):
+            w *= 1.6
+        elif e == "happy" and bid == "grumpy":
+            w *= 0.5
+        elif e == "bored" and bid in ("curious_approach", "snack_search"):
+            w *= 2.0
+        elif e == "bored" and bid == "walk":
+            w *= 1.4
+        elif e == "sad" and bid in ("shy_hide", "grumpy"):
+            w *= 2.0
+        elif e == "sad" and bid in ("excited", "dance"):
+            w *= 0.4
+        elif e == "excited" and bid in ("jump", "dance", "excited"):
+            w *= 1.8
+        elif e == "excited" and bid == "walk":
+            w *= 1.4
+        elif e == "sleepy" and bid == "sleep":
+            w *= 3.0
+        elif e == "sleepy" and bid in ("jump", "dance"):
+            w *= 0.3
+        elif e == "tsundere" and bid == "grumpy":
+            w *= 1.6
+        elif e == "tsundere" and bid == "curious_approach":
+            w *= 0.6
         return max(0.0, w)
 
     def choose_behavior(self) -> str:
@@ -261,6 +316,13 @@ class Brain:
         self.happy = _clamp(self.happy + (60 - self.happy) * dt * 0.02)
         self.fullness = _clamp(self.fullness - dt * 0.05)
         self.curiosity = _clamp(self.curiosity + self.rng.uniform(-0.4, 0.4) * dt)
+        self.emotion_t += dt
+        if self.emotion_t >= self.emotion_duration:
+            self.emotion_t = 0.0
+            self.emotion = self._roll_emotion()
+            lo, hi = EMOTIONS[self.emotion]["duration"]
+            self.emotion_duration = self.rng.uniform(lo, hi)
+            self.emotion_changed = True
         if self.behavior_t >= self.behavior_duration:
             self._apply_mood(BEHAVIORS[self.current].get("mood", {}))
             self._start(self.choose_behavior())
@@ -286,6 +348,8 @@ class Brain:
     # ---------------------------------------------------------- 文案
     def bubble_for(self, bid: str) -> str:
         pool = list(LINES.get(bid, LINES["idle_look"]))
+        if bid == "idle_look" and self.rng.random() < 0.5:
+            pool = pool + EMOTION_LINES[self.emotion]
         if self.traits.get("tsundere", 0) > 0.6 and bid in TSUNDERE_LINES:
             pool = pool + TSUNDERE_LINES[bid]
         if bid == "idle_look":
@@ -311,7 +375,18 @@ class Brain:
             self.happy = _clamp(self.happy - 8)
             self._start("shy_hide")
             return "shy_hide", "别戳了别戳了！我要躲起来了！"
-        self.happy = _clamp(self.happy + 3)
+        if self.emotion == "sad":
+            self.happy = _clamp(self.happy - 5)
+            self._start("shy_hide")
+            return "shy_hide", "（更委屈了）别戳了……呜。"
+        if self.emotion == "tsundere":
+            self.happy = _clamp(self.happy + 2)
+            self._start("grumpy")
+            return "grumpy", "哼！就知道戳我！（其实有点开心）"
+        if self.emotion in ("happy", "excited"):
+            self.happy = _clamp(self.happy + 5)
+        else:
+            self.happy = _clamp(self.happy + 3)
         self._start("excited")
         return "excited", self.bubble_for("excited")
 
@@ -390,8 +465,47 @@ class Brain:
         return "grumpy", self.rng.choice(LINES["repair_fail"])
 
     def status_line(self) -> str:
-        return (f"饱腹 {self.fullness:.0f}% · 吃过 {self.stats['meals']} 个文件 · "
+        return (f"现在{EMOTION_LABELS[self.emotion]} · "
+                f"饱腹 {self.fullness:.0f}% · 吃过 {self.stats['meals']} 个文件 · "
                 f"修好 {self.stats['repairs_ok']} 个")
+    # ---------------------------------------------------------- 随机情绪 + 主人互动
+    def _roll_emotion(self) -> str:
+        """掷一个新情绪：基础权重 + 性格加成（傲娇值高容易傲娇，胆大容易兴奋）。"""
+        weights = {}
+        for eid, spec in EMOTIONS.items():
+            w = float(spec["weight"])
+            if eid == "tsundere":
+                w *= 0.5 + self.traits.get("tsundere", 0.5) * 2
+            if eid == "happy":
+                w *= 0.5 + self.traits.get("sociable", 0.5)
+            if eid == "excited":
+                w *= 0.5 + self.traits.get("bold", 0.5)
+            weights[eid] = max(0.0, w)
+        ids = list(weights)
+        return self.rng.choices(ids, weights=[weights[i] for i in ids], k=1)[0]
+
+    def emotion_line(self) -> str:
+        return self.rng.choice(EMOTION_LINES[self.emotion])
+
+    def on_pet(self) -> tuple[str, str]:
+        """摸摸头：开心 +10。"""
+        self.stats["head_pats"] += 1
+        self.happy = _clamp(self.happy + 10)
+        self._start("excited")
+        return "excited", self.rng.choice(LINES["petted"])
+
+    def on_play(self) -> tuple[str, str]:
+        """陪它玩一会儿：玩球。"""
+        self._start("playing")
+        return "playing", self.rng.choice(LINES["playing"])
+
+    def on_ask(self) -> str:
+        """问问它在想什么：一半说心里话，一半反问主人。"""
+        if self.rng.random() < 0.5:
+            return self.rng.choice(LINES["thought"])
+        return self.rng.choice(LINES["ask_owner"])
+
+
 
 
     # ---------------------------------------------------------- 持久化
