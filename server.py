@@ -742,8 +742,7 @@ async def chibi3d(
 @app.post("/api/animate-pet")
 async def animate_pet(sprite_data: str = Form(...), action: str = Form("walk"), expression: str = Form("cheerful")):
     """Generate an opt-in, model-driven action clip and a transparent looping WebP for the desktop pet."""
-    if PUBLIC_HOSTED_MODE:
-        raise HTTPException(404, "公网测试版暂不开放 AI 动作生成。")
+    # 公网开放：访客点击即按次计费（约 $0.08/新角色动作，同角色动作缓存复用免费）。
     actions = {
         "walk": "The character walks back and forth with clear alternating steps, swinging arms, and visible leg movement.",
         "jump": "The character performs several energetic full-body two-foot jumps, raising both arms and landing with a playful crouch.",
