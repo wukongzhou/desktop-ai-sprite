@@ -1,4 +1,4 @@
-"""desktop_pet.py v3.5 — 拟人化桌宠（学习功能 + 砸屏幕对话框）。
+"""desktop_pet.py v3.5.1 — 拟人化桌宠（换性格必换名）。
 
 在 v2 的透明窗、拖拽、右键菜单、AI 动作循环基础上，接上 pet_brain：
 精灵自己随机动（走、跳、睡、发呆、凑近鼠标、假装忙……），心情值涨跌，
@@ -590,8 +590,13 @@ class DesktopSpriteApp:
             describe_personality(self.brain.profile) + "\n\n" + self.brain.status_line())
 
     def _reroll(self) -> None:
-        profile = roll_personality()
         old_name = self.brain.name
+        # 保证换出不一样的名字：同名就重掷（名字池 16 个，最多 50 次兜底）
+        profile = roll_personality()
+        tries = 1
+        while profile["name"] == old_name and tries < 50:
+            profile = roll_personality()
+            tries += 1
         self.brain = Brain(profile, has_ai_motion=bool(self.animation_frames),
                            memory_path=self.memory_path)
         self.brain.save(self.profile_path)
