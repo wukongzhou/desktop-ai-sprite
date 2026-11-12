@@ -1,3 +1,16 @@
+"""desktop_pet.py v3 — 拟人化桌宠（阶段一：活过来）。
+
+在 v2 的透明窗、拖拽、右键菜单、AI 动作循环基础上，接上 pet_brain：
+精灵自己随机动（走、跳、睡、发呆、凑近鼠标、假装忙……），心情值涨跌，
+戳它会生气（连戳会躲起来），双击会说心里话，性格存在 pet_profile.json 里。
+
+运行（Windows）：
+    python desktop_pet.py                      # 用 saved_sprites/latest_sprite.png
+    python desktop_pet.py --sprite xxx.png --animation yyy.webp
+    python desktop_pet.py --new-personality    # 换一个性格重新掷
+    python desktop_pet.py --profile 我的精灵.json
+性格档案默认保存在脚本旁边的 pet_profile.json，第一次运行自动掷一个。
+"""
 from __future__ import annotations
 
 import argparse
@@ -6,20 +19,56 @@ import random
 import sys
 import tkinter as tk
 from pathlib import Path
-from PIL import Image, ImageTk
+from PIL import Image, ImageOps, ImageTk
 
 ROOT = Path(__file__).parent
+sys.path.insert(0, str(ROOT))
+from pet_brain import (  # noqa: E402
+    Brain, describe_personality, roll_personality,
+)
+
 DEFAULT_SPRITE = ROOT / "saved_sprites" / "latest_sprite.png"
+DEFAULT_PROFILE = ROOT / "pet_profile.json"
+
+# 大脑行为 id -> 渲染分支
+RENDER_STATE = {
+    "idle_look": "idle", "walk": "walking", "jump": "jumping",
+    "sleep": "sleepy", "stretch": "stretch", "excited": "happy",
+    "grumpy": "grumpy", "curious_approach": "curious",
+    "work_busy": "computer", "snack_search": "curious",
+    "shy_hide": "walking", "dance": "happy", "ai_motion": "ai_motion",
+    "pickup": "pickup", "playing": "playing",
+}
+# 渲染分支 -> 大脑行为 id（右键菜单手动点）
+BEHAVIOR_FOR_STATE = {v: k for k, v in RENDER_STATE.items()}
 
 
 class DesktopSpriteApp:
     """Frameless, always-on-top transparent Windows desktop pet runner."""
 
-    def __init__(self, sprite_path: Path, name: str = "抽象小精灵", scale: float = 1.0, animation_path: Path | None = None):
+    def __init__(self, sprite_path: Path, name: str | None = None, scale: float = 1.0,
+                 animation_path: Path | None = None,
+                 profile_path: Path = DEFAULT_PROFILE,
+                 new_personality: bool = False):
         self.root = tk.Tk()
-        self.name = name
         self.scale = max(0.4, min(2.5, scale))
         self.base_size = int(220 * self.scale)
+        self.profile_path = Path(profile_path)
+
+        # ---- 性格档案：有就读，没有（或要求重掷）就掷一个并存下来
+        brain = Brain.load(self.profile_path)
+        if brain is None or new_personality:
+            profile = roll_personality()
+            if name:
+                profile["name"] = name
+            brain = Brain(profile)
+            brain.save(self.profile_path)
+            print("新精灵诞生：", describe_personality(profile))
+        elif name:
+            brain.profile["name"] = name
+            brain.name = name
+        self.brain = brain
+        self.name = brain.name
 
         self.root.title(f"桌面精灵 - {self.name}")
         self.root.overrideredirect(True)
@@ -65,39 +114,39 @@ class DesktopSpriteApp:
                     self.animation_frames.append(frame)
             except Exception as exc:
                 print(f"Could not read AI motion WebP: {exc}")
-        if self.animation_frames:
-            self.state = "ai_motion"
         if sys.platform.startswith("win"):
             # Tk 在 Windows 上用"透明色键"实现透明：半透明边缘会和键色混出一圈深色毛边。
             # 把 alpha 二值化，3D 萌宠的柔和边缘在桌面上就是干净的。
             alpha = self.raw_image.getchannel("A").point(lambda v: 255 if v >= 110 else 0)
             self.raw_image.putalpha(alpha)
-        self.state = "ai_motion" if self.animation_frames else "idle"  # AI loop when available, otherwise idle
+
+        self.brain.has_ai_motion = bool(self.animation_frames)
+        self.state = "ai_motion" if self.animation_frames else "idle"
         self.tick = 0
         self.drag_offset_x = 0
         self.drag_offset_y = 0
-        self.roam_enabled = False
+        self._press_x = 0
+        self._press_y = 0
+        self._press_tick = 0
+        self._dragged = False
+        self._click_seq = 0  # 点按序号：双击到来时作废等着的那一下戳
         self.vx = 1.8
-        self.action_started = 0
+        self.facing = 1  # 1 朝右，-1 朝左
+        self._save_tick = 0
 
-        self.quotes = {
-            "idle": [f"嗨！我是{self.name} ✨", "今天写代码灵感爆棚！", "双击我可以换个表情哦~"],
-            "happy": ["芜湖！特点放大100倍！🎉", "太酷啦！蓄力跳跃！", "给你比个大大大的赞！"],
-            "curious": ["咦？你在看什么好东西？👀", "让我凑近瞅一眼...", "发现华点！"],
-            "grumpy": ["哼！别戳我大脑袋！😤", "本精灵需要喝杯冰美式！", "略略略~"],
-            "sleepy": ["呼噜噜... 待机省电中 💤", "眼皮好沉呀...", "Zzz..."],
-        }
-        self.bubble_text = random.choice(self.quotes["idle"])
-        self.bubble_timer = 90
+        self.bubble_text = f"嗨！我是{self.name} ✨"
+        self.bubble_timer = 110
 
         self.tk_img = None
         self._bind_events()
         self._build_context_menu()
+        self.root.protocol("WM_DELETE_WINDOW", self._on_close)
         self._animate()
 
     def _bind_events(self) -> None:
         self.canvas.bind("<ButtonPress-1>", self._on_drag_start)
         self.canvas.bind("<B1-Motion>", self._on_drag_motion)
+        self.canvas.bind("<ButtonRelease-1>", self._on_release)
         self.canvas.bind("<Double-Button-1>", self._on_double_click)
         self.canvas.bind("<Button-3>", self._on_right_click)
 
@@ -121,49 +170,109 @@ class DesktopSpriteApp:
         self.menu.add_separator()
         self.menu.add_command(label="🚶 切换桌面自由巡游", command=self.toggle_roam)
         self.menu.add_separator()
-        self.menu.add_command(label="❌ 退出桌面精灵", command=self.root.destroy)
+        self.menu.add_command(label="💛 哄它一下", command=self._cheer)
+        self.menu.add_command(label="💤 睡觉 / 叫醒", command=self._toggle_sleep)
+        self.menu.add_command(label="🪪 看看性格卡", command=self._show_profile)
+        self.menu.add_command(label="🎲 换个性格（重掷）", command=self._reroll)
+        self.menu.add_separator()
+        self.menu.add_command(label="❌ 退出桌面精灵", command=self._on_close)
 
     def set_state(self, new_state: str) -> None:
+        bid = BEHAVIOR_FOR_STATE.get(new_state, "idle_look")
+        self.brain.force(bid)
         self.state = new_state
-        self.action_started = self.tick
-        action_quotes = {
-            "walking": ["出发散步啦！", "左看看右看看～"],
-            "jumping": ["蹦！再蹦一下！", "看我弹跳！"],
-            "pickup": ["发现了一个小东西！", "我来拿一下～"],
-            "computer": ["认真敲键盘中…", "今天也要努力工作！"],
-            "playing": ["自己玩球也很开心！", "接住！"],
-        }
-        self.bubble_text = random.choice(action_quotes.get(new_state, self.quotes.get(new_state, self.quotes["idle"])))
+        self.bubble_text = self.brain.bubble_for(bid)
         self.bubble_timer = 110
 
     def toggle_roam(self) -> None:
-        self.roam_enabled = not self.roam_enabled
-        self.bubble_text = "开启桌面巡游模式！" if self.roam_enabled else "已固定在当前位置~"
+        self.brain.roam = not self.brain.roam
+        self.bubble_text = "开启桌面巡游模式！" if self.brain.roam else "已固定在当前位置~"
         self.bubble_timer = 80
+
+    def _cheer(self) -> None:
+        self.bubble_text = self.brain.on_cheer()
+        self.bubble_timer = 110
+
+    def _toggle_sleep(self) -> None:
+        _bid, text = self.brain.on_wake_toggle()
+        self.bubble_text = text
+        self.bubble_timer = 110
+
+    def _show_profile(self) -> None:
+        self.bubble_text = describe_personality(self.brain.profile)
+        self.bubble_timer = 200
+
+    def _reroll(self) -> None:
+        profile = roll_personality()
+        old_name = self.brain.name
+        self.brain = Brain(profile, has_ai_motion=bool(self.animation_frames))
+        self.brain.save(self.profile_path)
+        self.name = self.brain.name
+        self.root.title(f"桌面精灵 - {self.name}")
+        self.bubble_text = f"我是新来的{self.name}！{old_name}先下班啦～"
+        self.bubble_timer = 140
 
     def _on_drag_start(self, event) -> None:
         self.drag_offset_x = event.x
         self.drag_offset_y = event.y
+        self._press_x, self._press_y = event.x, event.y
+        self._press_tick = self.tick
+        self._dragged = False
 
     def _on_drag_motion(self, event) -> None:
+        if abs(event.x - self._press_x) + abs(event.y - self._press_y) > 6:
+            self._dragged = True
         nx = self.root.winfo_x() + event.x - self.drag_offset_x
         ny = self.root.winfo_y() + event.y - self.drag_offset_y
         self.x, self.y = nx, ny
         self.root.geometry(f"+{nx}+{ny}")
 
+    def _on_release(self, _event) -> None:
+        was_drag = self._dragged
+        quick = self.tick - self._press_tick < 12
+        if was_drag:
+            # 拖完就晕，无需等双击判定
+            _bid, text = self.brain.on_drag_end()
+            self.bubble_text = text
+            self.bubble_timer = 110
+        elif quick:
+            # 轻点一下 = 戳它；但先等 260ms，看是不是双击的前半下
+            seq = self._click_seq + 1
+            self._click_seq = seq
+            self.root.after(260, lambda s=seq: self._maybe_poke(s))
+
+    def _maybe_poke(self, seq: int) -> None:
+        if seq != self._click_seq:
+            return  # 期间来了双击，这一下不算戳
+        _bid, text = self.brain.on_poke()
+        self.bubble_text = text
+        self.bubble_timer = 110
+
     def _on_double_click(self, _event) -> None:
-        states = ["idle", "happy", "curious", "grumpy", "sleepy", "walking", "jumping", "pickup", "computer", "playing"]
-        if self.animation_frames:
-            states.append("ai_motion")
-        idx = (states.index(self.state) + 1) % len(states)
-        self.set_state(states[idx])
+        self._click_seq += 1  # 作废等着的那一下戳
+        self.bubble_text = self.brain.on_double_click()
+        self.bubble_timer = 140
 
     def _on_right_click(self, event) -> None:
         self.menu.tk_popup(event.x_root, event.y_root)
 
+    def _on_close(self) -> None:
+        try:
+            self.brain.save(self.profile_path)
+        except Exception:
+            pass
+        self.root.destroy()
+
     def _animate(self) -> None:
         self.tick += 1
         t = self.tick * 0.12
+
+        # 大脑推进一帧；行为刚切换就换一句气泡
+        changed = self.brain.tick(0.033)
+        if changed:
+            self.bubble_text = self.brain.bubble_for(self.brain.current)
+            self.bubble_timer = 110
+        self.state = RENDER_STATE.get(self.brain.current, "idle")
 
         # Compute squash/stretch, bounce, and tilt by state
         sx, sy, dy, angle = 1.0, 1.0, 0.0, 0.0
@@ -177,6 +286,8 @@ class DesktopSpriteApp:
             sy = 1.0 + bounce * 0.10 - (1.0 - bounce) * 0.06
             dy = -bounce * 22.0
             angle = math.sin(t * 0.9) * 6.0
+            if self.brain.current == "dance":
+                angle = math.sin(t * 2.2) * 14.0
         elif self.state == "curious":
             angle = 12.0 * math.sin(t * 0.7)
             sx = 1.04
@@ -190,8 +301,11 @@ class DesktopSpriteApp:
             sx = 1.0 + math.sin(t * 0.45) * 0.04
             sy = 0.94 - math.sin(t * 0.45) * 0.04
             dy = 6.0 + math.sin(t * 0.45) * 3.0
+        elif self.state == "stretch":
+            sx = 0.94
+            sy = 1.0 + max(0.0, math.sin(t * 1.2)) * 0.12
+            dy = -4.0
         elif self.state == "walking":
-            dx = math.sin(t * 0.8) * 9
             dy = abs(math.sin(t * 4.0)) * 3
             angle = math.sin(t * 4.0) * 2.0
         elif self.state == "jumping":
@@ -203,15 +317,33 @@ class DesktopSpriteApp:
         elif self.state == "computer":
             dy = math.sin(t * 3.0) * 1.5
         elif self.state == "playing":
-            dx = math.sin(t * 1.2) * 7
             dy = -abs(math.sin(t * 2.0)) * 8
 
-        if self.roam_enabled or self.state == "walking":
-            screen_w = self.root.winfo_screenwidth()
-            self.x += int(self.vx)
+        # ---- 移动：走路 / 巡游 / 凑近鼠标 / 躲起来
+        screen_w = self.root.winfo_screenwidth()
+        if self.brain.current in ("walk", "shy_hide") or self.brain.roam:
+            speed = abs(self.vx) * (2.2 if self.brain.current == "shy_hide" else 1.0)
+            if self.brain.current == "shy_hide":
+                # 往最近的屏幕边躲
+                self.vx = -speed if self.x < screen_w // 2 else speed
+            self.x += int(speed) if self.vx > 0 else -int(speed)
             if self.x < 20 or self.x > screen_w - self.base_size - 80:
                 self.vx = -self.vx
+                self.x = max(20, min(screen_w - self.base_size - 80, self.x))
+            self.facing = 1 if self.vx > 0 else -1
             self.root.geometry(f"+{self.x}+{self.y}")
+        elif self.brain.current == "curious_approach":
+            try:
+                px = self.root.winfo_pointerx()
+            except Exception:
+                px = self.x + self.base_size // 2
+            target = px - (self.x + self.base_size // 2)
+            if abs(target) > 12:
+                step = 3 if target > 0 else -3
+                self.x += step
+                self.facing = 1 if step > 0 else -1
+                self.x = max(20, min(screen_w - self.base_size - 80, self.x))
+                self.root.geometry(f"+{self.x}+{self.y}")
 
         w = max(32, int(self.base_size * sx))
         h = max(32, int(self.base_size * sy))
@@ -222,6 +354,8 @@ class DesktopSpriteApp:
             angle = 0
         else:
             frame = self.raw_image.resize((w, h), Image.Resampling.BILINEAR)
+            if self.facing < 0:
+                frame = ImageOps.mirror(frame)
         if abs(angle) > 0.4:
             frame = frame.rotate(angle, resample=Image.Resampling.BICUBIC, expand=True)
 
@@ -279,6 +413,15 @@ class DesktopSpriteApp:
                 cx, 21, text=self.bubble_text, fill="#302a27", font=("Microsoft YaHei", 9, "bold")
             )
 
+        # 每 ~30 秒存一次档案（心情、被戳次数不断档）
+        self._save_tick += 1
+        if self._save_tick >= 900:
+            self._save_tick = 0
+            try:
+                self.brain.save(self.profile_path)
+            except Exception:
+                pass
+
         self.root.after(33, self._animate)
 
     def run(self) -> None:
@@ -288,9 +431,11 @@ class DesktopSpriteApp:
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run Always-on-Top Abstract Desktop Sprite")
     parser.add_argument("--sprite", type=str, default=str(DEFAULT_SPRITE), help="Path to transparent sprite PNG")
-    parser.add_argument("--name", type=str, default="抽象小精灵", help="Sprite display name")
+    parser.add_argument("--name", type=str, default="", help="Sprite display name (overrides profile)")
     parser.add_argument("--scale", type=float, default=1.0, help="Sprite size multiplier")
     parser.add_argument("--animation", type=str, default="", help="Optional AI-generated animated WebP")
+    parser.add_argument("--profile", type=str, default=str(DEFAULT_PROFILE), help="Personality profile JSON path")
+    parser.add_argument("--new-personality", action="store_true", help="Roll a fresh personality")
     args = parser.parse_args()
 
     sprite_path = Path(args.sprite)
@@ -299,10 +444,12 @@ def main() -> None:
         sys.exit(1)
 
     animation_path = Path(args.animation) if args.animation else None
-    pet = DesktopSpriteApp(sprite_path=sprite_path, name=args.name, scale=args.scale, animation_path=animation_path)
+    pet = DesktopSpriteApp(sprite_path=sprite_path, name=args.name or None, scale=args.scale,
+                           animation_path=animation_path,
+                           profile_path=Path(args.profile),
+                           new_personality=args.new_personality)
     pet.run()
 
 
 if __name__ == "__main__":
     main()
-
