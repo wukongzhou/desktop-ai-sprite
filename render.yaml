@@ -19,5 +19,5 @@ services:
       - key: CLOUDFLARE_VISION_MODEL
         value: "@cf/moondream/moondream3.1-9B-A2B"
       - key: CLOUDFLARE_IMAGE_MODEL
-        value: "@cf/black-forest-labs/flux-2-klein-9b"
+        value: "@cf/black-forest-labs/flux-2-klein-4b"
 

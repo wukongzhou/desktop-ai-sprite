@@ -352,7 +352,7 @@ class CloudflareSettings(BaseModel):
     account_id: str = Field(default="", max_length=80)
     api_token: str = Field(default="", max_length=500)
     vision_model: str = Field(default="@cf/moondream/moondream3.1-9B-A2B", max_length=180)
-    image_model: str = Field(default="@cf/black-forest-labs/flux-2-klein-9b", max_length=180)
+    image_model: str = Field(default="@cf/black-forest-labs/flux-2-klein-4b", max_length=180)
     video_model: str = Field(default="pixverse/v6", max_length=180)
 
 

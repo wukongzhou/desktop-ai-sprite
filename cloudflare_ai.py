@@ -5,6 +5,7 @@ import base64
 import io
 import json
 import os
+import time
 import urllib.error
 import urllib.request
 
@@ -13,7 +14,7 @@ from PIL import Image, ImageDraw
 
 
 VISION_MODEL = os.getenv("CLOUDFLARE_VISION_MODEL", "@cf/moondream/moondream3.1-9B-A2B")
-IMAGE_MODEL = os.getenv("CLOUDFLARE_IMAGE_MODEL", "@cf/black-forest-labs/flux-2-klein-9b")
+IMAGE_MODEL = os.getenv("CLOUDFLARE_IMAGE_MODEL", "@cf/black-forest-labs/flux-2-klein-4b")
 TEXTURES = {
     "blindbox": "MATERIAL: the entire head and body are hard injection-molded vinyl/resin, perfectly smooth and seamless, thick glossy clearcoat, crisp bright specular highlights that visibly reflect the studio lights; unmistakably a shiny collectible toy; absolutely no fuzz, fabric, stitches, fingerprints, or matte clay.",
     "clay": "MATERIAL: the entire head and body are hand-sculpted matte clay, visibly soft and slightly imperfect, subtle fingerprints and sculpting tool marks across the cheeks and body, rounded pressed clay shapes with soft diffuse highlights; absolutely no glossy resin, plastic clearcoat, fur, fabric, or sewn seams.",
@@ -90,18 +91,24 @@ def _run_multipart(model: str, fields: dict, files: dict, timeout: int = 300) ->
     req = urllib.request.Request(
         f"https://api.cloudflare.com/client/v4/accounts/{account}/ai/run/{model}", data=b"".join(chunks),
         headers={"Authorization": f"Bearer {token}", "Content-Type": f"multipart/form-data; boundary={boundary}"}, method="POST")
-    try:
-        with urllib.request.urlopen(req, timeout=timeout) as response:
-            data = json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
+    data = None
+    for attempt in range(3):
         try:
-            errors = json.loads(exc.read().decode("utf-8")).get("errors", [])
-            detail = "; ".join(str(item.get("message", item)) for item in errors) or "请求失败"
-        except Exception:
-            detail = "请求失败"
-        raise HTTPException(502, f"Cloudflare 图片参考生成失败 ({exc.code})：{detail}")
-    except (urllib.error.URLError, TimeoutError) as exc:
-        raise HTTPException(502, f"连接 Cloudflare AI 失败：{exc}")
+            with urllib.request.urlopen(req, timeout=timeout) as response:
+                data = json.loads(response.read().decode("utf-8"))
+            break
+        except urllib.error.HTTPError as exc:
+            try:
+                errors = json.loads(exc.read().decode("utf-8")).get("errors", [])
+                detail = "; ".join(str(item.get("message", item)) for item in errors) or "请求失败"
+            except Exception:
+                detail = "请求失败"
+            if exc.code in (500, 502, 503) and attempt < 2:
+                time.sleep(2)
+                continue
+            raise HTTPException(502, f"Cloudflare 图片参考生成失败 ({exc.code})：{detail}")
+        except (urllib.error.URLError, TimeoutError) as exc:
+            raise HTTPException(502, f"连接 Cloudflare AI 失败：{exc}")
     if not data.get("success", True):
         raise HTTPException(502, f"Cloudflare AI 返回错误：{data.get('errors')}")
     return data.get("result") or {}
@@ -154,7 +161,7 @@ def generate_sprite(source: Image.Image, *, traits: str = "", subject: str = "pe
         "Carefully designed silhouette, centered single character, plain pure white background, no text, no watermark. "
         f"Visible features to preserve from reference: {visual_traits}"
     )[:2048]
-    if "flux-2-klein-9b" in IMAGE_MODEL:
+    if "flux-2-klein" in IMAGE_MODEL:
         reference = vision.copy()
         reference.thumbnail((480, 480))
         ref_buffer = io.BytesIO()
