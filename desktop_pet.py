@@ -15,7 +15,9 @@ from __future__ import annotations
 
 import argparse
 import math
+import os
 import random
+import subprocess
 import sys
 import tkinter as tk
 from pathlib import Path
@@ -49,7 +51,8 @@ class DesktopSpriteApp:
     def __init__(self, sprite_path: Path, name: str | None = None, scale: float = 1.0,
                  animation_path: Path | None = None,
                  profile_path: Path = DEFAULT_PROFILE,
-                 new_personality: bool = False):
+                 new_personality: bool = False,
+                 boot: bool = False):
         self.root = tk.Tk()
         self.scale = max(0.4, min(2.5, scale))
         self.base_size = int(220 * self.scale)
@@ -57,6 +60,7 @@ class DesktopSpriteApp:
 
         # ---- 性格档案：有就读，没有（或要求重掷）就掷一个并存下来
         brain = Brain.load(self.profile_path)
+        fresh_profile = brain is None or new_personality
         if brain is None or new_personality:
             profile = roll_personality()
             if name:
@@ -136,11 +140,20 @@ class DesktopSpriteApp:
 
         self.bubble_text = f"嗨！我是{self.name} ✨"
         self.bubble_timer = 110
+        if boot:
+            # 开机启动进来的：像刚睡醒一样伸个懒腰
+            self.brain.force("stretch")
+            self.bubble_text = "（伸懒腰）睡醒啦！今天也要元气满满！"
+            self.bubble_timer = 160
 
         self.tk_img = None
         self._bind_events()
         self._build_context_menu()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
+        self._autostart_done = False
+        if fresh_profile and sys.platform.startswith("win"):
+            # 第一次启动：晚 1.5 秒再注册开机启动，先让精灵露脸
+            self.root.after(1500, self._ensure_autostart_once)
         self._animate()
 
     def _bind_events(self) -> None:
@@ -174,6 +187,8 @@ class DesktopSpriteApp:
         self.menu.add_command(label="💤 睡觉 / 叫醒", command=self._toggle_sleep)
         self.menu.add_command(label="🪪 看看性格卡", command=self._show_profile)
         self.menu.add_command(label="🎲 换个性格（重掷）", command=self._reroll)
+        if sys.platform.startswith("win"):
+            self.menu.add_command(label="🔄 开机自启 开/关", command=self._toggle_autostart)
         self.menu.add_separator()
         self.menu.add_command(label="❌ 退出桌面精灵", command=self._on_close)
 
@@ -197,6 +212,48 @@ class DesktopSpriteApp:
         _bid, text = self.brain.on_wake_toggle()
         self.bubble_text = text
         self.bubble_timer = 110
+
+    def _shortcut_script(self) -> Path:
+        return ROOT / "创建快捷方式.ps1"
+
+    def _run_shortcut_script(self, action: str) -> bool:
+        ps1 = self._shortcut_script()
+        if not ps1.exists():
+            return False
+        try:
+            r = subprocess.run(
+                ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
+                 "-File", str(ps1), "-Action", action, "-Dir", str(ROOT)],
+                capture_output=True, timeout=60)
+            return r.returncode == 0
+        except Exception:
+            return False
+
+    def _startup_link(self) -> Path:
+        appdata = os.environ.get("APPDATA", "")
+        return (Path(appdata) / "Microsoft" / "Windows" / "Start Menu"
+                / "Programs" / "Startup" / "桌面精灵.lnk")
+
+    def _ensure_autostart_once(self) -> None:
+        if self._autostart_done or not sys.platform.startswith("win"):
+            return
+        self._autostart_done = True
+        if self._run_shortcut_script("install"):
+            print("已加入开机启动。")
+
+    def _toggle_autostart(self) -> None:
+        if not sys.platform.startswith("win"):
+            self.bubble_text = "开机自启只在 Windows 上可用。"
+            self.bubble_timer = 110
+            return
+        link = self._startup_link()
+        if link.exists():
+            ok = self._run_shortcut_script("remove")
+            self.bubble_text = "已取消开机自启。" if ok else "取消失败，手动删掉开机启动里的「桌面精灵」就行。"
+        else:
+            ok = self._run_shortcut_script("install")
+            self.bubble_text = "开机自启已开启，下次开机它就醒了！" if ok else "没找到 创建快捷方式.ps1，装不上开机启动。"
+        self.bubble_timer = 140
 
     def _show_profile(self) -> None:
         self.bubble_text = describe_personality(self.brain.profile)
@@ -436,6 +493,7 @@ def main() -> None:
     parser.add_argument("--animation", type=str, default="", help="Optional AI-generated animated WebP")
     parser.add_argument("--profile", type=str, default=str(DEFAULT_PROFILE), help="Personality profile JSON path")
     parser.add_argument("--new-personality", action="store_true", help="Roll a fresh personality")
+    parser.add_argument("--boot", action="store_true", help="Wake-up mode: started from system startup")
     args = parser.parse_args()
 
     sprite_path = Path(args.sprite)
@@ -447,7 +505,8 @@ def main() -> None:
     pet = DesktopSpriteApp(sprite_path=sprite_path, name=args.name or None, scale=args.scale,
                            animation_path=animation_path,
                            profile_path=Path(args.profile),
-                           new_personality=args.new_personality)
+                           new_personality=args.new_personality,
+                           boot=args.boot)
     pet.run()
 
 

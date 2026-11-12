@@ -338,6 +338,12 @@
               </div>
               <p class="mt-1 text-[10px] leading-relaxed text-[#76685f]">此项调用 Cloudflare PixVerse 图生视频，生成的是角色肢体动作帧，不是图片缩放。首次生成新角色/动作会产生模型费用；相同角色动作会缓存复用。生成后再召唤桌宠即可播放。</p>
             </div>
+            <div class="rounded-xl border border-[#e9d4c4] bg-white/80 p-2.5">
+              <div class="flex flex-wrap items-center gap-2">
+                <button id="btnPetPack" type="button" class="w-full rounded-full bg-[#1c1917] px-6 py-3.5 text-base font-extrabold text-white shadow-[0_10px_24px_rgba(60,30,10,0.35)] transition hover:-translate-y-0.5 hover:bg-black hover:shadow-[0_14px_30px_rgba(60,30,10,0.45)] active:scale-95 disabled:opacity-60 sm:w-auto">🚀 召唤到本机桌面</button>
+              </div>
+              <p class="mt-1 text-[10px] leading-relaxed text-[#76685f]">点一下，安装包下载下来：精灵图 + 桌宠程序 + 性格档案 + 一键启动 + 双语安装手册，解压双击就能把精灵请到桌面上。</p>
+            </div>
             <p id="chibiMsg" class="text-[11px] text-[#9c4d36] min-h-[16px] leading-relaxed"></p>
           </div>
 
@@ -1798,6 +1804,25 @@
         try{const fd=new FormData();fd.append('sprite_data',baseSpriteCanvas.toDataURL('image/png'));fd.append('action',action);fd.append('expression',document.getElementById('selMotionExpression').value);const r=await fetch('/api/animate-pet',{method:'POST',body:fd});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.detail||`动作生成失败 (HTTP ${r.status})`);state.aiMotionUrl=d.animation_url;state.aiMotionFile=d.animation_file;document.getElementById('aiMotionStage').src=d.animation_url;document.getElementById('aiMotionSandbox').src=d.animation_url;document.getElementById('aiMotionStage').classList.remove('hidden');document.getElementById('aiMotionSandbox').classList.remove('hidden');spriteStageCanvas.classList.add('hidden');sandboxPetCanvas.classList.add('hidden');document.getElementById('sandboxActionName').textContent=motionNames[action]+' · AI循环';msg.textContent=langSel.value==='zh'?`✅ 已生成「${motionNames[action]}」AI 全身动作，带动态表情${d.cached?'（本机缓存）':''}。召唤到桌面即可播放。`:`✅ AI full-body ${motionNames[action]} animation with facial expressions is ready${d.cached?' (cached)':''}. Summon the pet to play it on the desktop.`;}
         catch(e){msg.textContent='❌ '+e.message;}
         finally{button.disabled=false;button.textContent=langSel.value==='zh'?'🎬 生成 3 秒 AI 动作（约 $0.08）':'🎬 Generate 3s AI motion (~$0.08)';}
+      });
+
+      document.getElementById('btnPetPack').addEventListener('click',async()=>{
+        const msg=document.getElementById('chibiMsg');
+        if(!state.customSpriteUrl){msg.textContent='先生成一个 3D 萌宠，再下载安装包。';return;}
+        const button=document.getElementById('btnPetPack');
+        button.disabled=true;msg.textContent=langSel.value==='zh'?'⏳ 正在打包你的桌宠安装包…':'⏳ Packing your desktop pet installer…';
+        try{
+          const fd=new FormData();fd.append('sprite_data',baseSpriteCanvas.toDataURL('image/png'));
+          if(state.aiMotionFile)fd.append('animation_file',state.aiMotionFile);
+          const r=await fetch('/api/pet-pack',{method:'POST',body:fd});
+          if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(d.detail||`打包失败 (HTTP ${r.status})`);}
+          const blob=await r.blob();const name=decodeURIComponent(r.headers.get('X-Pet-Name')||'');
+          const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;
+          a.download=`桌面精灵-${name||'安装包'}.zip`;document.body.appendChild(a);a.click();a.remove();
+          setTimeout(()=>URL.revokeObjectURL(url),5000);
+          msg.textContent=langSel.value==='zh'?`✅ 安装包已下载：你的精灵${name?`叫「${name}」`:''}，解压后双击「启动精灵」就能把它请到桌面上。`:`✅ Installer downloaded${name?` — your pet is called ${name}`:''}. Extract it and double-click the launcher to invite it to your desktop.`;
+        }catch(e){msg.textContent='❌ '+e.message;}
+        finally{button.disabled=false;}
       });
 
       document.getElementById('btnChibi3d').addEventListener('click', runChibi3d);

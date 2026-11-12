@@ -1,0 +1,42 @@
+﻿桌面精灵 {PET_NAME} · 安装手册
+Desktop Sprite {PET_NAME} · Installation Manual
+================================================
+
+一、包里有什么 | What's inside
+- sprite.png — 你的精灵图 / Your sprite image
+- animation.webp — AI 全身动作（如果生成过）/ AI motion clip (if generated)
+- desktop_pet.py / pet_brain.py — 桌宠程序 / The desktop pet program
+- pet_profile.json — 精灵的性格档案（名字、性格、怪癖）/ Personality profile
+- 精灵.ico — 精灵的头像图标 / The sprite's icon
+- 启动精灵.bat — 一键启动 / One-click launcher
+- 创建快捷方式.ps1 — 桌面图标与开机启动脚本 / Shortcut & auto-start script
+
+二、需要什么 | Requirements
+- Windows 10 / 11
+- Python 3.9 或以上（没有会自动打开官网下载）/ Python 3.9+ (the launcher opens the download page if missing)
+- 第一次启动需要联网装 Pillow 图片库 / Internet needed once to install Pillow
+
+三、安装步骤 | Install
+1. 把安装包解压到任意文件夹（单独一个文件夹，别直接放桌面根目录）/ Extract the ZIP to any folder.
+2. 双击「启动精灵.bat」/ Double-click 启动精灵.bat.
+3. 第一次启动会自动：装好 Pillow、在桌面建一个精灵图标、加入开机启动。/ First launch automatically installs Pillow, creates a desktop icon, and adds the pet to startup.
+4. 精灵出现在桌面右下角，开始自己活动。/ The sprite appears at the bottom-right of your desktop and starts moving on its own.
+
+四、怎么玩 | How to play
+- 轻点它：打招呼；3 秒里连点三下：它会躲起来 / Click: say hi. Triple-click in 3 seconds: it hides.
+- 双击：它会说一句心里话 / Double-click: it shares a thought.
+- 拖动：把它拎起来，放下会晕乎乎 / Drag: pick it up, it gets dizzy when dropped.
+- 右键菜单：哄它、睡觉/叫醒、看性格卡、换性格、开关开机自启 / Right-click menu: cheer it up, sleep/wake, view personality, re-roll personality, toggle auto-start.
+
+五、开机自启 | Auto-start
+- 第一次启动后，每次开机它都会自己醒来（伸个懒腰）。/ After the first launch, it wakes up on every boot (with a big stretch).
+- 不想要：右键精灵 →「开机自启 开/关」。/ To turn off: right-click the pet → toggle auto-start.
+
+六、换精灵 | Change sprite
+- 重新在网站生成并下载安装包，解压到同一个文件夹覆盖即可。/ Generate a new sprite on the website, download a new pack, extract over the same folder.
+
+七、常见问题 | FAQ
+- 双击没反应：右键「启动精灵.bat」→ 用 Python 打开；或确认已装 Python。/ Nothing happens: right-click the .bat → Open with Python, or check Python is installed.
+- 精灵不见了：它可能睡着在角落，或被别的窗口盖住了；重启一次桌宠。/ Pet missing: it may be sleeping in a corner or behind a window; relaunch it.
+- 卸载：删掉整个文件夹，再把桌面图标和开机启动里的「桌面精灵」快捷方式删掉即可。/ To uninstall: delete the folder, plus the desktop icon and the Startup shortcut.
+- 桌宠不会说话，它用气泡和动作跟你交流。/ The pet doesn't talk; it communicates with bubbles and gestures.

@@ -14,11 +14,12 @@ import sqlite3
 import time
 import shutil
 import tempfile
+import zipfile
 import urllib.request
 import urllib.error
 from datetime import datetime, timedelta, timezone
 from string import Template
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 import os
 import subprocess
 import sys
@@ -31,7 +32,7 @@ from dotenv import set_key
 import numpy as np
 from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, JSONResponse, Response, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.concurrency import run_in_threadpool
 from PIL import Image, ImageChops, ImageDraw, ImageEnhance, ImageFilter, ImageOps
@@ -39,6 +40,12 @@ from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).with_name(".env"))
 import comfy_chibi
+
+PET_PACK_DIR = Path(__file__).parent / "pet_pack"
+try:
+    from pet_brain import roll_personality as _roll_personality
+except Exception:
+    _roll_personality = None
 
 ROOT = Path(__file__).parent
 ASSETS_DIR = ROOT / "assets"
@@ -851,6 +858,72 @@ async def animate_pet(sprite_data: str = Form(...), action: str = Form("walk"), 
         "animation_file": animation_path.name, "video_url": f"/saved_sprites/{video_path.name}",
         "expression": expression,
         "cached": cached}
+
+
+
+def _fallback_personality() -> dict:
+    import random as _rng_module
+    rng = _rng_module.Random()
+    return {
+        "name": rng.choice(["团团", "糖糖", "麻薯", "布丁"]),
+        "traits": {"sociable": 0.6, "diligent": 0.5, "bold": 0.5, "foodie": 0.6, "tsundere": 0.5},
+        "quirks": ["爱模仿主人", "怕黑"],
+        "favorite_snack": ".jpg 小零食",
+        "born": time.strftime("%Y-%m-%d"),
+    }
+
+
+@app.post("/api/pet-pack")
+async def pet_pack(sprite_data: str = Form(...), animation_file: str = Form(""),
+                  pet_name: str = Form("")):
+    """把本次生成的精灵打成 Windows 安装包 ZIP：精灵图 + 桌宠程序 + 现掷性格 + 一键启动 + 双语手册。"""
+    if not sprite_data.startswith("data:image/"):
+        raise HTTPException(400, "精灵图片格式不对。")
+    try:
+        _header, b64 = sprite_data.split(",", 1)
+        raw = base64.b64decode(b64)
+    except Exception:
+        raise HTTPException(400, "精灵图片解不开。")
+    if len(raw) > 9 * 1024 * 1024:
+        raise HTTPException(400, "精灵图片太大了（上限 9MB）。")
+    try:
+        img = Image.open(io.BytesIO(raw)).convert("RGBA")
+    except Exception:
+        raise HTTPException(400, "精灵图片打不开。")
+    profile = _roll_personality() if _roll_personality else _fallback_personality()
+    if pet_name.strip():
+        profile["name"] = pet_name.strip()[:20]
+    name = profile["name"]
+    ico_buf = io.BytesIO()
+    # 图标先居中贴到透明正方形底上，再按图片实际尺寸出 ICO（小图也要能打包）
+    side = max(img.width, img.height)
+    square = Image.new("RGBA", (side, side), (0, 0, 0, 0))
+    square.paste(img, ((side - img.width) // 2, (side - img.height) // 2))
+    ico_sizes = [(s, s) for s in (16, 32, 48, 256) if s <= side] or [(side, side)]
+    square.save(ico_buf, format="ICO", sizes=ico_sizes)
+    manual = (PET_PACK_DIR / "manual.txt").read_text(encoding="utf-8").replace("{PET_NAME}", name)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr("sprite.png", raw)
+        if animation_file:
+            anim_path = SPRITES_DIR / Path(animation_file).name
+            if anim_path.exists() and anim_path.is_file():
+                zf.write(anim_path, "animation.webp")
+        for code_file in ("desktop_pet.py", "pet_brain.py"):
+            code_path = ROOT / code_file
+            if code_path.exists():
+                zf.write(code_path, code_file)
+        zf.writestr("pet_profile.json", json.dumps(profile, ensure_ascii=False, indent=2))
+        zf.writestr("精灵.ico", ico_buf.getvalue())
+        zf.writestr("启动精灵.bat", (PET_PACK_DIR / "launcher.bat").read_text(encoding="utf-8"))
+        zf.writestr("创建快捷方式.ps1", (PET_PACK_DIR / "setup_shortcuts.ps1").read_text(encoding="utf-8"))
+        zf.writestr("安装手册.txt", manual)
+    buf.seek(0)
+    filename = f"桌面精灵-{name}.zip"
+    return StreamingResponse(buf, media_type="application/zip", headers={
+        "Content-Disposition": f"attachment; filename*=UTF-8''{quote(filename)}",
+        "X-Pet-Name": quote(name),
+    })
 
 
 @app.post("/api/launch-pet")
