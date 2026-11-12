@@ -514,6 +514,9 @@
             <button id="btnDownloadJson" type="button" class="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-[#eee4d7] hover:bg-[#e2d4c3] text-[#3a312c] transition">
               📄 导出动画配置 JSON
             </button>
+            <button id="btnShare" type="button" class="px-3.5 py-2.5 rounded-xl text-xs font-bold bg-[#3b82a0] hover:bg-[#2f6d86] text-white transition">
+              🔗 分享给朋友
+            </button>
           </div>
           <span id="exportToast" class="text-xs font-semibold text-emerald-700"></span>
         </div>
@@ -542,6 +545,22 @@
         </div>
       </div>
 
+    </section>
+
+    <!-- Community: stats + comments -->
+    <section class="mt-6 rounded-3xl bg-white/70 p-5 shadow-sm border border-[#efe5d8]">
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <h2 class="text-base font-black">💬 大家怎么说 <span class="text-xs font-bold text-[#8b4a32]">留言区</span></h2>
+        <a href="/stats" target="_blank" class="text-xs font-bold text-[#d8653c] underline">📊 数据后台</a>
+      </div>
+      <p id="statsLine" class="mt-1 text-xs text-[#6d5d53]">正在加载访问数据…</p>
+      <div class="mt-3 flex flex-wrap gap-2">
+        <input id="commentName" maxlength="20" placeholder="你的名字（可不填）" class="rounded-xl border px-3 py-2 text-xs w-36">
+        <input id="commentText" maxlength="200" placeholder="留句话吧，最多 200 字…" class="rounded-xl border px-3 py-2 text-xs flex-1 min-w-[180px]">
+        <button id="btnCommentSubmit" type="button" class="rounded-xl bg-[#d8653c] px-4 py-2 text-xs font-bold text-white">发表</button>
+      </div>
+      <p id="commentStatus" class="mt-2 min-h-4 text-xs text-[#8b4a32]"></p>
+      <ul id="commentList" class="mt-2 space-y-2"></ul>
     </section>
   </main>
 
@@ -1213,7 +1232,7 @@
         '🚶 自由巡游：开启中':'🚶 Roaming: on','👉 戳一戳精灵':'👉 Poke pet','当前动作':'Current action','待生成 AI 动作':'Generate an AI action first','动作可在左侧「3D 萌宠生成」中切换和生成':'Choose and generate actions in the 3D pet panel',
         '拖我到桌面任何地方~ ✨':'Drag me anywhere on the desktop ✨','🌤️ 24°C 台北':'🌤️ 24°C Taipei','桌面置顶模式 · 12:39':'Always on top · 12:39',
         '标准游戏/桌宠 5行 × 4列 精灵序列帧表 (idle / happy / curious / grumpy / sleepy)':'Standard 5 × 4 game-pet sprite sheet (idle / happy / curious / grumpy / sleepy)',
-        '⬇️ 下载透明精灵 PNG':'⬇️ Download transparent PNG','🎞️ 导出 20 帧序列图 (Sprite Sheet)':'🎞️ Export 20-frame sprite sheet','📄 导出动画配置 JSON':'📄 Export animation manifest JSON',
+        '⬇️ 下载透明精灵 PNG':'⬇️ Download transparent PNG','🎞️ 导出 20 帧序列图 (Sprite Sheet)':'🎞️ Export 20-frame sprite sheet','📄 导出动画配置 JSON':'📄 Export animation manifest JSON','🔗 分享给朋友':'🔗 Share with friends',
         '🔍 1. 怎么做到「上传即放大特点」？':'🔍 1. How does trait extraction work?','采用':'We use','多焦点径向特征场 (Multi-Lobe Radial Warp)':'AI vision to identify visible traits',
         '：对头部、左右眼/眼镜、嘴巴和头顶配饰分别建立独立非线性膨胀核，配合抽象色块量化与手绘墨线，既保留原图高辨识度配色与神态，又产生极具张力的卡通变形。':': hair, glasses, accessories, expression and colors guide a newly generated cartoon character.',
         '🏃 2. 怎么变成真正的桌面精灵？':'🏃 2. How does it become a desktop pet?','自动剥离背景并生成':'The AI creates a new character with a transparent background and',
@@ -1887,6 +1906,51 @@
         starter.onload = () => { baseSpriteCtx.clearRect(0,0,256,256); const k=Math.min(256/starter.width,256/starter.height); const w=starter.width*k,h=starter.height*k; baseSpriteCtx.drawImage(starter,(256-w)/2,(256-h)/2,w,h); state.customSpriteUrl='/saved_sprites/latest_sprite.png'; renderSpriteSheet(); };
         starter.onerror = () => { document.getElementById('chibiMsg').textContent='上传图片并连接 AI 接口后，即可生成你的专属 3D 萌宠。'; };
         starter.src='/saved_sprites/latest_sprite.png';
+        // --- 使用统计 + 留言 ---
+        async function recordStat(kind){ try { await fetch('/api/stats/event', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({kind})}); } catch (_) {} }
+        recordStat('page_view');
+        async function loadStats(){ try { const r = await fetch('/api/stats/summary'); if (!r.ok) return; const d = await r.json(); const t = d.totals || {}; document.getElementById('statsLine').textContent = `已有 ${t.page_view||0} 次访问 · ${t.generate||0} 次生成 · ${t.share||0} 次分享 · ${t.download||0} 次下载 · ${d.comments||0} 条留言`; } catch (_) {} }
+        loadStats();
+        document.getElementById('btnDownloadSingle').addEventListener('click', () => recordStat('download'));
+        document.getElementById('btnShare').addEventListener('click', async () => {
+          const url = location.href;
+          let shared = false;
+          try { if (navigator.share) { await navigator.share({title: document.title, url}); shared = true; } } catch (_) { shared = false; }
+          if (shared) { document.getElementById('exportToast').textContent = '✅ 已分享'; }
+          else { try { await navigator.clipboard.writeText(url); document.getElementById('exportToast').textContent = '✅ 链接已复制，发给朋友吧'; } catch (_) { document.getElementById('exportToast').textContent = '链接：' + url; } }
+          recordStat('share'); loadStats();
+        });
+        function renderComments(list){
+          const ul = document.getElementById('commentList'); ul.innerHTML = '';
+          if (!list.length) { const li = document.createElement('li'); li.className = 'text-xs text-[#8b7d72]'; li.textContent = '还没有留言，来抢沙发～'; ul.appendChild(li); return; }
+          list.forEach(c => {
+            const li = document.createElement('li');
+            li.className = 'text-xs leading-relaxed';
+            const head = document.createElement('div');
+            const name = document.createElement('b'); name.textContent = c.name || '匿名';
+            const when = document.createElement('span'); when.className = 'text-[#8b7d72] ml-2'; when.textContent = c.ts ? new Date(c.ts * 1000).toLocaleString() : '';
+            head.appendChild(name); head.appendChild(when);
+            const body = document.createElement('p'); body.className = 'text-[#5c5048] mt-0.5'; body.textContent = c.text;
+            li.appendChild(head); li.appendChild(body); ul.appendChild(li);
+          });
+        }
+        async function loadComments(){ try { const r = await fetch('/api/comments'); if (!r.ok) return; const d = await r.json(); renderComments(d.comments || []); } catch (_) {} }
+        loadComments();
+        document.getElementById('btnCommentSubmit').addEventListener('click', async () => {
+          const name = document.getElementById('commentName').value.trim();
+          const text = document.getElementById('commentText').value.trim();
+          const statusEl = document.getElementById('commentStatus');
+          if (!text) { statusEl.textContent = '先写点什么再发表～'; return; }
+          statusEl.textContent = '发表中…';
+          try {
+            const r = await fetch('/api/comments', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({name, text})});
+            const d = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(d.detail || '发表失败');
+            document.getElementById('commentText').value = '';
+            statusEl.textContent = '✅ 已发表';
+            loadComments(); loadStats();
+          } catch (e) { statusEl.textContent = '❌ ' + e.message; }
+        });
         checkBackendStatus();
         requestAnimationFrame(tick);
       });

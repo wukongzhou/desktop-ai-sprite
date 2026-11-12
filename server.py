@@ -8,10 +8,15 @@ import math
 import re
 import hashlib
 import hmac
+import html
+import sqlite3
+import time
 import shutil
 import tempfile
 import urllib.request
 import urllib.error
+from datetime import datetime, timedelta, timezone
+from string import Template
 from urllib.parse import urlparse
 import os
 import subprocess
@@ -55,12 +60,15 @@ except Exception:
 app = FastAPI(title="Abstract Desktop Sprite Studio (抽象桌面精灵工坊)")
 PUBLIC_HOSTED_MODE = os.getenv("PUBLIC_HOSTED_MODE", "0").strip().lower() in {"1", "true", "yes"}
 
+def access_code_required() -> bool:
+    """口令关卡：只有设置了 APP_ACCESS_CODE 才启用；不设口令 = 公开使用。"""
+    return PUBLIC_HOSTED_MODE and bool(os.getenv("APP_ACCESS_CODE", "").strip())
+
+
 @app.middleware("http")
 async def public_access_gate(request: Request, call_next):
-    if PUBLIC_HOSTED_MODE and request.url.path.startswith("/api/") and request.url.path != "/api/access/verify":
+    if access_code_required() and request.url.path.startswith("/api/") and request.url.path != "/api/access/verify":
         expected = os.getenv("APP_ACCESS_CODE", "").strip()
-        if not expected:
-            return JSONResponse(status_code=503, content={"detail": "公网访问口令尚未配置。"})
         supplied = request.cookies.get("pet_access_code", "")
         if not hmac.compare_digest(supplied, expected):
             return JSONResponse(status_code=401, content={"detail": "请输入测试访问口令。"})
@@ -68,11 +76,9 @@ async def public_access_gate(request: Request, call_next):
 
 @app.post("/api/access/verify")
 async def verify_public_access(request: Request):
-    if not PUBLIC_HOSTED_MODE:
+    if not access_code_required():
         return {"required": False}
     expected = os.getenv("APP_ACCESS_CODE", "").strip()
-    if not expected:
-        raise HTTPException(503, "公网访问口令尚未配置。")
     try:
         body = await request.json()
         supplied = str(body.get("code", ""))
@@ -83,6 +89,77 @@ async def verify_public_access(request: Request):
     response = JSONResponse({"ok": True})
     response.set_cookie("pet_access_code", expected, httponly=True, secure=request.url.scheme == "https", samesite="strict", max_age=1209600)
     return response
+
+# ---------------------------------------------------------------------------
+# 使用统计 + 留言（SQLite，存在 data/stats.db；Render 免费版重启/重新部署会清空）
+# ---------------------------------------------------------------------------
+STATS_DIR = ROOT / "data"
+STATS_DB = STATS_DIR / "stats.db"
+EVENT_KINDS = {"page_view", "generate", "share", "download"}
+STATS_TEMPLATE = Template('<!DOCTYPE html>\n<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">\n<title>桌面精灵 · 数据后台</title>\n<style>body{font-family:system-ui,sans-serif;max-width:720px;margin:0 auto;padding:24px 16px;color:#2b2522;background:#faf6f0}h1{font-size:20px}h2{font-size:16px;margin-top:28px}.cards{display:flex;gap:12px;flex-wrap:wrap}.card{background:#fff;border:1px solid #eadfd2;border-radius:16px;padding:14px 18px;min-width:120px}.card b{font-size:26px;display:block}table{border-collapse:collapse;width:100%;background:#fff}td,th{border:1px solid #eadfd2;padding:6px 8px;font-size:13px;text-align:center}ul{list-style:none;padding:0}li{background:#fff;border:1px solid #eadfd2;border-radius:12px;padding:10px 12px;margin-bottom:8px}li span{color:#8b7d72;font-size:12px}li p{margin:6px 0 0;font-size:14px;white-space:pre-wrap;word-break:break-word}a{color:#d8653c}</style></head>\n<body><h1>📊 桌面精灵 · 数据后台</h1><p><a href="/">← 回精灵工坊</a></p>\n<div class="cards"><div class="card">访问量<b>$views</b></div><div class="card">生成次数<b>$generates</b></div><div class="card">分享次数<b>$shares</b></div><div class="card">下载次数<b>$downloads</b></div><div class="card">留言条数<b>$comments_n</b></div></div>\n<h2>最近 7 天（UTC）</h2><table><tr><th>日期</th><th>访问</th><th>生成</th><th>分享</th><th>下载</th></tr>$rows</table>\n<h2>留言（最新 $n 条）</h2><ul>$body</ul></body></html>')
+
+
+def _stats_conn():
+    STATS_DIR.mkdir(exist_ok=True)
+    conn = sqlite3.connect(str(STATS_DB))
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS events (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " kind TEXT NOT NULL, ts INTEGER NOT NULL, ip TEXT NOT NULL DEFAULT '')"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS comments (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " name TEXT NOT NULL DEFAULT '', text TEXT NOT NULL, ts INTEGER NOT NULL,"
+        " ip TEXT NOT NULL DEFAULT '')"
+    )
+    conn.commit()
+    return conn
+
+
+def _client_ip(request: Request) -> str:
+    forwarded = request.headers.get("x-forwarded-for", "")
+    if forwarded:
+        return forwarded.split(",")[0].strip()[:64]
+    return (request.client.host if request.client else "")[:64]
+
+
+def record_event(kind: str, ip: str = "") -> None:
+    try:
+        conn = _stats_conn()
+        conn.execute(
+            "INSERT INTO events (kind, ts, ip) VALUES (?, ?, ?)",
+            (kind, int(time.time()), ip),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        pass
+
+
+def _summary_data() -> dict:
+    totals = {kind: 0 for kind in ("page_view", "generate", "share", "download")}
+    daily = []
+    comments = 0
+    try:
+        conn = _stats_conn()
+        for kind, count in conn.execute("SELECT kind, COUNT(*) FROM events GROUP BY kind"):
+            if kind in totals:
+                totals[kind] = int(count)
+        today = datetime.now(timezone.utc).date()
+        for back in range(7):
+            day = today - timedelta(days=back)
+            start = int(datetime(day.year, day.month, day.day, tzinfo=timezone.utc).timestamp())
+            row = dict(conn.execute(
+                "SELECT kind, COUNT(*) FROM events WHERE ts >= ? AND ts < ? GROUP BY kind",
+                (start, start + 86400),
+            ).fetchall())
+            daily.append({"date": day.isoformat(), **{k: 0 for k in totals},
+                          **{k: int(v) for k, v in row.items() if k in totals}})
+        comments = int(conn.execute("SELECT COUNT(*) FROM comments").fetchone()[0])
+        conn.close()
+    except Exception:
+        pass
+    return {"totals": totals, "daily": daily, "comments": comments}
+
 
 app.add_middleware(
     CORSMiddleware,
@@ -542,6 +619,7 @@ async def chibi3d(
         latest_path = SPRITES_DIR / "latest_sprite.png"
         if not PUBLIC_HOSTED_MODE:
             latest_path.write_bytes(png_bytes)
+        record_event("generate")
         return JSONResponse({
             "image": "data:image/png;base64," + base64.b64encode(png_bytes).decode("ascii"),
             "engine": f"Cloudflare Workers AI ({cloudflare_ai.VISION_MODEL} + {cloudflare_ai.IMAGE_MODEL})",
@@ -574,6 +652,7 @@ async def chibi3d(
         latest_path.write_bytes(png_bytes)
         result["raw"].save(SPRITES_DIR / "latest_chibi_raw.png")
 
+    record_event("generate")
     return JSONResponse({
         "image": "data:image/png;base64," + base64.b64encode(png_bytes).decode("ascii"),
         "engine": f"comfyui:{result['checkpoint']}",
@@ -750,6 +829,104 @@ async def launch_pet(
         return {"launched": True, "pid": pet_process.pid, "sprite": str(latest_path), "name": pet_name}
     except Exception as e:
         raise HTTPException(500, detail=f"Failed to launch desktop pet window: {e}")
+
+
+@app.post("/api/stats/event")
+async def stats_event(request: Request):
+    try:
+        body = await request.json()
+        kind = str(body.get("kind", ""))
+    except Exception:
+        kind = ""
+    if kind not in EVENT_KINDS:
+        raise HTTPException(400, "未知统计类型。")
+    record_event(kind, _client_ip(request))
+    return {"ok": True}
+
+
+@app.get("/api/stats/summary")
+def stats_summary():
+    return _summary_data()
+
+
+class CommentIn(BaseModel):
+    name: str = Field(default="", max_length=20)
+    text: str = Field(default="", max_length=200)
+
+
+@app.get("/api/comments")
+def list_comments():
+    items = []
+    try:
+        conn = _stats_conn()
+        for cid, name, text, ts in conn.execute(
+            "SELECT id, name, text, ts FROM comments ORDER BY id DESC LIMIT 50"
+        ):
+            items.append({"id": cid, "name": name, "text": text, "ts": ts})
+        conn.close()
+    except Exception:
+        pass
+    return {"comments": items}
+
+
+@app.post("/api/comments")
+def post_comment(request: Request, body: CommentIn):
+    text = body.text.strip()
+    name = body.name.strip() or "匿名"
+    if not text:
+        raise HTTPException(400, "留言内容不能为空。")
+    ip = _client_ip(request)
+    try:
+        conn = _stats_conn()
+        last = conn.execute(
+            "SELECT ts FROM comments WHERE ip = ? ORDER BY id DESC LIMIT 1", (ip,)
+        ).fetchone()
+        if last and int(time.time()) - int(last[0]) < 30:
+            conn.close()
+            raise HTTPException(429, "留言太频繁，30 秒后再试。")
+        conn.execute(
+            "INSERT INTO comments (name, text, ts, ip) VALUES (?, ?, ?, ?)",
+            (name, text, int(time.time()), ip),
+        )
+        conn.commit()
+        conn.close()
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(500, "留言保存失败。")
+    return {"ok": True}
+
+
+@app.get("/stats", include_in_schema=False)
+def stats_page():
+    data = _summary_data()
+    totals = data["totals"]
+    rows = "".join(
+        f"<tr><td>{html.escape(d['date'])}</td><td>{d['page_view']}</td>"
+        f"<td>{d['generate']}</td><td>{d['share']}</td><td>{d['download']}</td></tr>"
+        for d in data["daily"]
+    )
+    comments = []
+    try:
+        conn = _stats_conn()
+        for _cid, name, text, ts in conn.execute(
+            "SELECT id, name, text, ts FROM comments ORDER BY id DESC LIMIT 100"
+        ):
+            when = datetime.fromtimestamp(int(ts), tz=timezone.utc).strftime("%m-%d %H:%M")
+            comments.append(
+                f"<li><b>{html.escape(name)}</b> <span>{html.escape(when)}</span>"
+                f"<p>{html.escape(text)}</p></li>"
+            )
+        conn.close()
+    except Exception:
+        pass
+    body = "".join(comments) if comments else "<li>还没有留言。</li>"
+    page = STATS_TEMPLATE.safe_substitute(
+        views=totals["page_view"], generates=totals["generate"],
+        shares=totals["share"], downloads=totals["download"],
+        comments_n=data["comments"], rows=rows, body=body, n=len(comments),
+    )
+    return Response(page, media_type="text/html; charset=utf-8")
 
 
 @app.get("/", include_in_schema=False)
