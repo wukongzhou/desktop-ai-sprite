@@ -360,17 +360,9 @@
             </div>
             <div class="rounded-xl border border-[#e9d4c4] bg-white/80 p-2.5">
               <div class="flex flex-wrap items-center gap-2">
-                <label class="text-[11px] font-bold">AI 全身动作<select id="selMotionAction" class="ml-2 rounded-lg border px-2 py-1.5 text-xs"><option value="walk">来回走动</option><option value="jump">蹦蹦跳跳</option><option value="pickup">弯腰拿取物品</option><option value="computer">坐下使用电脑</option><option value="play">追球玩耍</option></select></label>
-                <label class="text-[11px] font-bold">表情<select id="selMotionExpression" class="ml-1 rounded-lg border px-2 py-1.5 text-xs"><option value="cheerful">开心</option><option value="curious">好奇</option><option value="focused">专注</option><option value="surprised">惊讶</option><option value="grumpy">傲娇</option></select></label>
-                <button id="btnAiMotion" type="button" class="rounded-xl bg-[#313d78] px-3 py-2 text-xs font-extrabold text-white disabled:opacity-60">🎬 生成 3 秒 AI 动作（约 $0.08）</button>
-              </div>
-              <p class="mt-1 text-[10px] leading-relaxed text-[#76685f]">此项调用 Cloudflare PixVerse 图生视频，生成的是角色肢体动作帧，不是图片缩放。首次生成新角色/动作会产生模型费用；相同角色动作会缓存复用。生成后再召唤桌宠即可播放。</p>
-            </div>
-            <div class="rounded-xl border border-[#e9d4c4] bg-white/80 p-2.5">
-              <div class="flex flex-wrap items-center gap-2">
                 <button id="btnPetPack" type="button" class="w-full rounded-full bg-[#1c1917] px-6 py-3.5 text-base font-extrabold text-white shadow-[0_10px_24px_rgba(60,30,10,0.35)] transition hover:-translate-y-0.5 hover:bg-black hover:shadow-[0_14px_30px_rgba(60,30,10,0.45)] active:scale-95 disabled:opacity-60 sm:w-auto">🚀 召唤到本机桌面</button>
               </div>
-              <p class="mt-1 text-[10px] leading-relaxed text-[#76685f]">免费下载，不用生成 AI 动作也能下。点一下，安装包下载下来：精灵图 + 桌宠程序 + 性格档案 + 一键启动 + 双语安装手册，解压双击就能把精灵请到桌面上。</p>
+              <p class="mt-1 text-[10px] leading-relaxed text-[#76685f]">免费下载。点一下，安装包下载下来：精灵图 + 桌宠程序 + 性格档案 + 一键启动 + 双语安装手册，解压双击就能把精灵请到桌面上。</p>
             </div>
             <p id="chibiMsg" class="text-[11px] text-[#9c4d36] min-h-[16px] leading-relaxed"></p>
           </div>
@@ -497,8 +489,8 @@
           </div>
 
           <div id="actionBar" class="absolute bottom-14 left-3 right-3 z-20 flex flex-wrap items-center gap-2 rounded-xl bg-[#101321]/80 p-2.5 text-white backdrop-blur">
-            <span class="text-[11px] font-bold">当前动作</span><span id="sandboxActionName" class="rounded-lg bg-white/15 px-2 py-1 text-[11px]">待生成 AI 动作</span>
-            <span class="ml-auto text-[10px] text-white/70">动作可在左侧「3D 萌宠生成」中切换和生成</span>
+            <span class="text-[11px] font-bold">当前动作</span><span id="sandboxActionName" class="rounded-lg bg-white/15 px-2 py-1 text-[11px]">自由巡游</span>
+            <span class="ml-auto text-[10px] text-white/70">精灵正在画布上自由活动</span>
           </div>
 
           <!-- Draggable Pet Container inside Desktop Sandbox -->
@@ -634,7 +626,6 @@
         <label class="text-xs font-bold">API Token<input id="apiToken" type="password" autocomplete="new-password" class="mt-1 w-full rounded-xl border p-2.5 font-normal" placeholder="粘贴具有 Workers AI 权限的 token"></label>
         <label class="text-xs font-bold">视觉分析模型<input id="apiVisionModel" class="mt-1 w-full rounded-xl border p-2.5 font-normal" value="@cf/moondream/moondream3.1-9B-A2B"></label>
         <label class="text-xs font-bold">图片生成模型<input id="apiImageModel" class="mt-1 w-full rounded-xl border p-2.5 font-normal" value="@cf/black-forest-labs/flux-1-schnell"></label>
-        <label class="text-xs font-bold">AI 动作视频模型<input id="apiVideoModel" class="mt-1 w-full rounded-xl border p-2.5 font-normal" value="pixverse/v6"></label>
       </div>
       <p id="apiSettingsStatus" class="mt-3 min-h-5 text-xs text-[#8b4a32]"></p>
       <div class="mt-2 flex flex-wrap justify-end gap-2"><button id="btnApiTest" class="rounded-xl border px-3.5 py-2 text-xs font-bold">保存并测试接口</button><button id="btnApiSave" class="rounded-xl bg-[#d8653c] px-3.5 py-2 text-xs font-bold text-white">保存接口</button></div>
@@ -1260,15 +1251,13 @@
         '盲盒玩具（光滑树脂）':'Vinyl collectible','皮克斯动画':'Animated film','黏土手作':'Clay figure','毛绒玩偶':'Plush toy',
         '🎯 特点还原度（越高越像原图，越低越自由发挥）':'🎯 Trait similarity (higher keeps more details)','🧸 生成 3D 萌宠':'🧸 Generate 3D pet','🎲 换一个':'🎲 Regenerate',
         'AI 全身动作':'AI full-body action','表情':'Expression','开心':'Cheerful','好奇':'Curious','专注':'Focused','惊讶':'Surprised','傲娇':'Grumpy','来回走动':'Walk around','蹦蹦跳跳':'Jump','弯腰拿取物品':'Pick up an item','坐下使用电脑':'Use a computer','追球玩耍':'Play with a ball',
-        '🎬 生成 3 秒 AI 动作（约 $0.08）':'🎬 Generate 3s AI motion (~$0.08)',
-        '此项调用 Cloudflare PixVerse 图生视频，生成的是角色肢体动作帧，不是图片缩放。首次生成新角色/动作会产生模型费用；相同角色动作会缓存复用。生成后再召唤桌宠即可播放。':'Uses Cloudflare PixVerse image-to-video to animate the character’s body, not scale the still image. Model fees apply the first time for each pet/action; repeat requests use the local cache. Generate an action before summoning the pet.',
         '✨ 精灵单帧/动画预览':'✨ Pet preview','🖥️ Windows 桌面模拟沙盒':'🖥️ Desktop sandbox','🎞️ 5×4 精灵序列帧表':'🎞️ Sprite sheet',
         '精灵昵称：':'Pet name:','透明 PNG 通道已启用 · 点击精灵可互动':'Transparent background · click the pet to interact',
         '嗨！我的特点已经被抽象放大啦 ✨':'Hi! My features are larger than life ✨','✨ 待机呼吸':'✨ Idle','🎉 开心跳跃':'🎉 Happy jump','👀 好奇歪头':'👀 Curious','😤 傲娇抖动':'😤 Grumpy','💤 犯困打盹':'💤 Sleepy','动效幅度':'Motion speed',
         '此电脑':'This PC','我的精灵':'My pets','desktop_pet.py — 置顶透明桌宠预览':'desktop_pet.py — transparent desktop pet',
         '# 在这个模拟桌面上，你可以直接用鼠标拖拽右下角的精灵！':'# Drag the pet around this desktop sandbox.',
         '> 双击精灵可切换状态，点击上方「开启自由巡游」让它在任务栏散步。':'> Double-click to change its mood, or enable roaming above.',
-        '🚶 自由巡游：开启中':'🚶 Roaming: on','👉 戳一戳精灵':'👉 Poke pet','当前动作':'Current action','待生成 AI 动作':'Generate an AI action first','动作可在左侧「3D 萌宠生成」中切换和生成':'Choose and generate actions in the 3D pet panel',
+        '🚶 自由巡游：开启中':'🚶 Roaming: on','👉 戳一戳精灵':'👉 Poke pet','当前动作':'Current action','自由巡游':'Roaming freely','精灵正在画布上自由活动':'The pet is roaming freely on the canvas',
         '拖我到桌面任何地方~ ✨':'Drag me anywhere on the desktop ✨','🌤️ 24°C 台北':'🌤️ 24°C Taipei','桌面置顶模式 · 12:39':'Always on top · 12:39',
         '标准游戏/桌宠 5行 × 4列 精灵序列帧表 (idle / happy / curious / grumpy / sleepy)':'Standard 5 × 4 game-pet sprite sheet (idle / happy / curious / grumpy / sleepy)',
         '⬇️ 下载透明精灵 PNG':'⬇️ Download transparent PNG','🎞️ 导出 20 帧序列图 (Sprite Sheet)':'🎞️ Export 20-frame sprite sheet','📄 导出动画配置 JSON':'📄 Export animation manifest JSON','🔗 分享给朋友':'🔗 Share with friends',
@@ -1282,7 +1271,7 @@
         '后，双击':'then double-click','或':'or','即可运行。':'to start the app.',
         '🚀 召唤桌面置顶精灵':'🚀 Summon desktop pet','保存当前精灵为 latest_sprite.png':'Save current pet as latest_sprite.png','知道了':'OK',
         '🔑 Cloudflare Workers AI 接口':'🔑 Cloudflare Workers AI API','填写你自己的 Cloudflare Account ID 和 API Token。令牌只保存在本机项目 .env 中；读取设置时不会返回令牌原文。已保存过令牌时，令牌栏留空即可保留。':'Enter your Cloudflare Account ID and API Token. The token is saved only in the local .env file and is never returned to the page. Leave it blank to keep a saved token.',
-        '盲盒玩具 · 硬亮光树脂':'Blind-box toy · glossy resin','电影级 CGI · 柔和次表面光':'Film CGI · soft subsurface light','哑光手捏黏土 · 指纹肌理':'Matte hand-sculpted clay · fingerprints','蓬松布偶 · 纤维与缝线':'Fuzzy plush · fibers and seams','视觉分析模型':'Vision model','图片生成模型':'Image model','AI 动作视频模型':'AI video model','保存并测试接口':'Save & test API','保存接口':'Save API'
+        '盲盒玩具 · 硬亮光树脂':'Blind-box toy · glossy resin','电影级 CGI · 柔和次表面光':'Film CGI · soft subsurface light','哑光手捏黏土 · 指纹肌理':'Matte hand-sculpted clay · fingerprints','蓬松布偶 · 纤维与缝线':'Fuzzy plush · fibers and seams','视觉分析模型':'Vision model','图片生成模型':'Image model','保存并测试接口':'Save & test API','保存接口':'Save API'
       };
       // Offline translations for the essential generation controls keep the page
       // usable in all 30 locales even when the cloud translation quota is busy.
@@ -1692,16 +1681,16 @@
       document.getElementById('btnApiSettings').addEventListener('click',async()=>{
         apiModal.classList.remove('hidden');apiModal.classList.add('flex');
         const status=document.getElementById('apiSettingsStatus');status.textContent='正在读取本机 API 配置…';
-        try{const r=await fetch('/api/settings/ai');const d=await r.json();document.getElementById('apiAccountId').value=d.account_id||'';document.getElementById('apiVisionModel').value=d.vision_model||'@cf/moondream/moondream3.1-9B-A2B';document.getElementById('apiImageModel').value=d.image_model||'@cf/black-forest-labs/flux-1-schnell';document.getElementById('apiVideoModel').value=d.video_model||'pixverse/v6';status.textContent=d.configured?'接口已配置。API Token 已隐藏，留空可保留现有令牌。':'尚未配置，请填写 Account ID 和 API Token。';}catch(e){status.textContent='无法读取本机服务设置：'+e.message;}
+        try{const r=await fetch('/api/settings/ai');const d=await r.json();document.getElementById('apiAccountId').value=d.account_id||'';document.getElementById('apiVisionModel').value=d.vision_model||'@cf/moondream/moondream3.1-9B-A2B';document.getElementById('apiImageModel').value=d.image_model||'@cf/black-forest-labs/flux-1-schnell';status.textContent=d.configured?'接口已配置。API Token 已隐藏，留空可保留现有令牌。':'尚未配置，请填写 Account ID 和 API Token。';}catch(e){status.textContent='无法读取本机服务设置：'+e.message;}
       });
       document.getElementById('btnApiClose').addEventListener('click',()=>{apiModal.classList.add('hidden');apiModal.classList.remove('flex');});
       document.getElementById('btnApiSave').addEventListener('click',async()=>{
         const status=document.getElementById('apiSettingsStatus'),button=document.getElementById('btnApiSave');button.disabled=true;status.textContent='正在安全保存到本机 .env…';
-        try{const r=await fetch('/api/settings/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account_id:document.getElementById('apiAccountId').value,api_token:document.getElementById('apiToken').value,vision_model:document.getElementById('apiVisionModel').value,image_model:document.getElementById('apiImageModel').value,video_model:document.getElementById('apiVideoModel').value})});const d=await r.json();if(!r.ok)throw new Error(d.detail||'保存失败');document.getElementById('apiToken').value='';status.textContent='✅ 已保存。令牌已隐藏，可点击「测试接口」验证视觉模型。';checkBackendStatus();}catch(e){status.textContent='❌ '+e.message;}finally{button.disabled=false;}
+        try{const r=await fetch('/api/settings/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account_id:document.getElementById('apiAccountId').value,api_token:document.getElementById('apiToken').value,vision_model:document.getElementById('apiVisionModel').value,image_model:document.getElementById('apiImageModel').value})});const d=await r.json();if(!r.ok)throw new Error(d.detail||'保存失败');document.getElementById('apiToken').value='';status.textContent='✅ 已保存。令牌已隐藏，可点击「测试接口」验证视觉模型。';checkBackendStatus();}catch(e){status.textContent='❌ '+e.message;}finally{button.disabled=false;}
       });
       document.getElementById('btnApiTest').addEventListener('click',async()=>{
         const status=document.getElementById('apiSettingsStatus'),button=document.getElementById('btnApiTest');button.disabled=true;status.textContent='正在保存当前配置并调用视觉模型…';
-        try{const save=await fetch('/api/settings/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account_id:document.getElementById('apiAccountId').value,api_token:document.getElementById('apiToken').value,vision_model:document.getElementById('apiVisionModel').value,image_model:document.getElementById('apiImageModel').value,video_model:document.getElementById('apiVideoModel').value})});const sd=await save.json();if(!save.ok)throw new Error(sd.detail||'配置保存失败');document.getElementById('apiToken').value='';const r=await fetch('/api/settings/ai/test',{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(d.detail||'接口测试失败');status.textContent='✅ '+d.message+'（'+d.model+'）';checkBackendStatus();}catch(e){status.textContent='❌ '+e.message;}finally{button.disabled=false;}
+        try{const save=await fetch('/api/settings/ai',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({account_id:document.getElementById('apiAccountId').value,api_token:document.getElementById('apiToken').value,vision_model:document.getElementById('apiVisionModel').value,image_model:document.getElementById('apiImageModel').value})});const sd=await save.json();if(!save.ok)throw new Error(sd.detail||'配置保存失败');document.getElementById('apiToken').value='';const r=await fetch('/api/settings/ai/test',{method:'POST'});const d=await r.json();if(!r.ok)throw new Error(d.detail||'接口测试失败');status.textContent='✅ '+d.message+'（'+d.model+'）';checkBackendStatus();}catch(e){status.textContent='❌ '+e.message;}finally{button.disabled=false;}
       });
 
       async function checkBackendStatus() {
@@ -1796,7 +1785,7 @@
               document.getElementById('aiMotionStage').classList.add('hidden');
               document.getElementById('aiMotionSandbox').classList.add('hidden');
               spriteStageCanvas.classList.remove('hidden'); sandboxPetCanvas.classList.remove('hidden');
-              document.getElementById('sandboxActionName').textContent=langSel.value==='zh'?'待生成 AI 动作':'Generate an AI action first';
+              document.getElementById('sandboxActionName').textContent=langSel.value==='zh'?'自由巡游':'Roaming freely';
               renderSpriteSheet();
               resolve();
             };
@@ -1815,15 +1804,6 @@
           document.querySelectorAll('.style-card').forEach((c) => { c.disabled = false; c.classList.remove('opacity-60','cursor-wait'); });
         }
       }
-      const motionNames=langSel.value==='zh'?{walk:'来回走动',jump:'蹦蹦跳跳',pickup:'弯腰拿取物品',computer:'坐下使用电脑',play:'追球玩耍'}:{walk:'Walk around',jump:'Jump',pickup:'Pick up an item',computer:'Use a computer',play:'Play with a ball'};
-      document.getElementById('btnAiMotion').addEventListener('click',async()=>{
-        if(!state.customSpriteUrl){document.getElementById('chibiMsg').textContent='先生成一个 3D 萌宠，再生成 AI 全身动作。';return;}
-        const action=document.getElementById('selMotionAction').value,button=document.getElementById('btnAiMotion'),msg=document.getElementById('chibiMsg');
-        button.disabled=true;button.textContent='⏳ '+(langSel.value==='zh'?'AI 正在生成角色动作…':'Generating AI character motion…');msg.textContent=langSel.value==='zh'?`正在生成「${motionNames[action]}」3 秒动作；同一只精灵的同一动作会从本机缓存读取。`:`Generating a 3-second ${motionNames[action]} clip. Repeats for the same pet and action use the local cache.`;
-        try{const fd=new FormData();fd.append('sprite_data',baseSpriteCanvas.toDataURL('image/png'));fd.append('action',action);fd.append('expression',document.getElementById('selMotionExpression').value);const r=await fetch('/api/animate-pet',{method:'POST',body:fd});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.detail||`动作生成失败 (HTTP ${r.status})`);state.aiMotionUrl=d.animation_url;state.aiMotionFile=d.animation_file;document.getElementById('aiMotionStage').src=d.animation_url;document.getElementById('aiMotionSandbox').src=d.animation_url;document.getElementById('aiMotionStage').classList.remove('hidden');document.getElementById('aiMotionSandbox').classList.remove('hidden');spriteStageCanvas.classList.add('hidden');sandboxPetCanvas.classList.add('hidden');document.getElementById('sandboxActionName').textContent=motionNames[action]+' · AI循环';msg.textContent=langSel.value==='zh'?`✅ 已生成「${motionNames[action]}」AI 全身动作，带动态表情${d.cached?'（本机缓存）':''}。召唤到桌面即可播放。`:`✅ AI full-body ${motionNames[action]} animation with facial expressions is ready${d.cached?' (cached)':''}. Summon the pet to play it on the desktop.`;}
-        catch(e){msg.textContent='❌ '+e.message;}
-        finally{button.disabled=false;button.textContent=langSel.value==='zh'?'🎬 生成 3 秒 AI 动作（约 $0.08）':'🎬 Generate 3s AI motion (~$0.08)';}
-      });
 
       document.getElementById('btnPetPack').addEventListener('click',async()=>{
         const msg=document.getElementById('chibiMsg');
