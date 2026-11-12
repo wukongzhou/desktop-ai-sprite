@@ -553,8 +553,11 @@
 
     </section>
 
-    <!-- Community: stats + comments -->
-    <section class="mt-6 lg:col-span-12 rounded-3xl bg-white/70 p-5 shadow-sm border border-[#efe5d8]">
+  </main>
+
+  <!-- Community: full-width, outside the workspace grid (so it can never be squeezed into one column) -->
+  <section class="w-full max-w-7xl mx-auto px-4 sm:px-6 pb-8">
+    <div class="rounded-3xl bg-white/70 p-5 shadow-sm border border-[#efe5d8]">
       <div class="flex items-center justify-between flex-wrap gap-2">
         <h2 class="text-base font-black">💬 大家怎么说 <span class="text-xs font-bold text-[#8b4a32]">留言区</span></h2>
         <a href="/stats" target="_blank" class="text-xs font-bold text-[#d8653c] underline">📊 数据后台</a>
@@ -581,8 +584,12 @@
       </div>
       <p id="commentStatus" class="mt-2 min-h-4 text-xs text-[#8b4a32]"></p>
       <ul id="commentList" class="mt-2 space-y-2"></ul>
-    </section>
-  </main>
+    </div>
+  </section>
+
+  <footer class="w-full max-w-7xl mx-auto px-4 sm:px-6 pb-6 text-center text-xs text-[#8a7a6e]">
+    抽象桌面精灵工坊 · 开源仓库 <a href="https://github.com/wukongzhou/desktop-ai-sprite" target="_blank" class="underline">github.com/wukongzhou/desktop-ai-sprite</a> · 下载到本地全程免费
+  </footer>
 
   <!-- Modal for Desktop Pet Summon Instructions / Status -->
   <div id="petModal" class="fixed inset-0 z-50 hidden bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
