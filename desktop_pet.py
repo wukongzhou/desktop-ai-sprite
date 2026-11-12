@@ -1,4 +1,4 @@
-"""desktop_pet.py v3 — 拟人化桌宠（阶段一：活过来）。
+"""desktop_pet.py v3.2 — 拟人化桌宠（阶段二：吃文件 + 修文件）。
 
 在 v2 的透明窗、拖拽、右键菜单、AI 动作循环基础上，接上 pet_brain：
 精灵自己随机动（走、跳、睡、发呆、凑近鼠标、假装忙……），心情值涨跌，
@@ -19,15 +19,29 @@ import os
 import random
 import subprocess
 import sys
+import threading
+import time
 import tkinter as tk
 from pathlib import Path
+from tkinter import filedialog, messagebox
 from PIL import Image, ImageOps, ImageTk
 
 ROOT = Path(__file__).parent
 sys.path.insert(0, str(ROOT))
 from pet_brain import (  # noqa: E402
-    Brain, describe_personality, roll_personality,
+    ASK_MB, FULLNESS_REFUSE, Brain, describe_personality, roll_personality,
 )
+
+try:
+    import pet_tools
+except Exception:
+    pet_tools = None
+
+try:
+    from tkinterdnd2 import TkinterDnD, DND_FILES
+except Exception:
+    TkinterDnD = None
+    DND_FILES = None
 
 DEFAULT_SPRITE = ROOT / "saved_sprites" / "latest_sprite.png"
 DEFAULT_PROFILE = ROOT / "pet_profile.json"
@@ -40,6 +54,7 @@ RENDER_STATE = {
     "work_busy": "computer", "snack_search": "curious",
     "shy_hide": "walking", "dance": "happy", "ai_motion": "ai_motion",
     "pickup": "pickup", "playing": "playing",
+    "eating": "happy", "overstuffed": "sleepy", "repairing": "repairing",
 }
 # 渲染分支 -> 大脑行为 id（右键菜单手动点）
 BEHAVIOR_FOR_STATE = {v: k for k, v in RENDER_STATE.items()}
@@ -53,7 +68,15 @@ class DesktopSpriteApp:
                  profile_path: Path = DEFAULT_PROFILE,
                  new_personality: bool = False,
                  boot: bool = False):
-        self.root = tk.Tk()
+        self._dnd = False
+        if TkinterDnD is not None:
+            try:
+                self.root = TkinterDnD.Tk()
+                self._dnd = True
+            except Exception:
+                self.root = tk.Tk()
+        else:
+            self.root = tk.Tk()
         self.scale = max(0.4, min(2.5, scale))
         self.base_size = int(220 * self.scale)
         self.profile_path = Path(profile_path)
@@ -137,6 +160,15 @@ class DesktopSpriteApp:
         self.vx = 1.8
         self.facing = 1  # 1 朝右，-1 朝左
         self._save_tick = 0
+        self._pending_file: dict | None = None  # 拖进来 / 选进来的文件，等主人选吃还是修
+        self._recycle_queue: list[dict] = []
+        self._recycle_seen: set[str] = set()
+        self._recycle_ignore_until = 0.0
+        self._repair_busy = False
+        self._repair_result: dict | None = None
+        self._repair_started = 0.0
+        self._menu_eat_label = "🍽️ 吃掉这个文件"
+        self._menu_fix_label = "🔧 修修这个文件"
 
         self.bubble_text = f"嗨！我是{self.name} ✨"
         self.bubble_timer = 110
@@ -154,6 +186,12 @@ class DesktopSpriteApp:
         if fresh_profile and sys.platform.startswith("win"):
             # 第一次启动：晚 1.5 秒再注册开机启动，先让精灵露脸
             self.root.after(1500, self._ensure_autostart_once)
+        if pet_tools is not None:
+            try:
+                self._recycle_seen = {it["info_path"] for it in pet_tools.find_recycle_bin_items()}
+            except Exception:
+                self._recycle_seen = set()
+            self.root.after(1500, self._poll_recycle_bin)
         self._animate()
 
     def _bind_events(self) -> None:
@@ -162,6 +200,12 @@ class DesktopSpriteApp:
         self.canvas.bind("<ButtonRelease-1>", self._on_release)
         self.canvas.bind("<Double-Button-1>", self._on_double_click)
         self.canvas.bind("<Button-3>", self._on_right_click)
+        if self._dnd:
+            try:
+                self.canvas.drop_target_register(DND_FILES)
+                self.canvas.dnd_bind("<<Drop>>", self._on_file_drop)
+            except Exception:
+                self._dnd = False
 
     def _build_context_menu(self) -> None:
         self.menu = tk.Menu(self.root, tearoff=0)
@@ -189,6 +233,13 @@ class DesktopSpriteApp:
         self.menu.add_command(label="🎲 换个性格（重掷）", command=self._reroll)
         if sys.platform.startswith("win"):
             self.menu.add_command(label="🔄 开机自启 开/关", command=self._toggle_autostart)
+        if pet_tools is not None:
+            self.menu.add_separator()
+            self.menu.add_command(label="🍽️ 喂它吃个文件…", command=self._feed_via_dialog)
+            self.menu.add_command(label="🔧 让它修个文件…", command=self._repair_via_dialog)
+            self.menu.add_command(label="🍽️ 吃掉这个文件", command=self._eat_pending_file, state="disabled")
+            self.menu.add_command(label="🔧 修修这个文件", command=self._repair_pending_file, state="disabled")
+            self.menu.add_command(label="🚫 算了，不吃了", command=self._cancel_pending)
         self.menu.add_separator()
         self.menu.add_command(label="❌ 退出桌面精灵", command=self._on_close)
 
@@ -255,9 +306,219 @@ class DesktopSpriteApp:
             self.bubble_text = "开机自启已开启，下次开机它就醒了！" if ok else "没找到 创建快捷方式.ps1，装不上开机启动。"
         self.bubble_timer = 140
 
-    def _show_profile(self) -> None:
-        self.bubble_text = describe_personality(self.brain.profile)
+    # ---------------------------------------------------------- 阶段二：吃文件 / 修文件
+    def _offer_file(self, path: Path, ask_text: str) -> None:
+        """拖进来 / 选进来的文件先放着，等主人右键选吃还是修。"""
+        self._pending_file = {"path": str(path), "at": time.monotonic()}
+        for label in (self._menu_eat_label, self._menu_fix_label):
+            try:
+                self.menu.entryconfig(label, state="normal")
+            except Exception:
+                pass
+        self.bubble_text = ask_text
+        self.bubble_timer = 220
+
+    def _clear_pending_file(self) -> None:
+        self._pending_file = None
+        for label in (self._menu_eat_label, self._menu_fix_label):
+            try:
+                self.menu.entryconfig(label, state="disabled")
+            except Exception:
+                pass
+
+    def _on_file_drop(self, event) -> None:
+        try:
+            paths = self.root.tk.splitlist(event.data)
+        except Exception:
+            return
+        if not paths:
+            return
+        path = Path(paths[0])
+        if not path.exists() or not path.is_file():
+            self.bubble_text = "这个我接不住，再拖一个文件试试～"
+            self.bubble_timer = 120
+            return
+        if len(paths) > 1:
+            self.bubble_text = "一次一个哦，先处理这个～"
+            self.bubble_timer = 120
+        self._offer_file(path, "这个文件……吃掉还是修修看？右键菜单选一个～")
+
+    def _feed_via_dialog(self) -> None:
+        path = filedialog.askopenfilename(title="喂它吃个文件（会移进回收站，可恢复）")
+        if path:
+            self._feed_file(Path(path))
+
+    def _feed_file(self, path: Path, confirmed: bool = False) -> None:
+        if pet_tools is None:
+            self.bubble_text = "缺少 pet_tools.py，吃不了文件。"
+            self.bubble_timer = 120
+            return
+        if not path.exists() or not path.is_file():
+            return
+        size = path.stat().st_size
+        if self.brain.fullness >= FULLNESS_REFUSE:
+            _bid, text = self.brain.on_eat(size, pet_tools.classify_file(path), path.name)
+            self.bubble_text = text
+            self.bubble_timer = 140
+            return
+        if not confirmed and size > ASK_MB * 1024 * 1024:
+            self._offer_file(path, "这个好大……真的要我吃吗？右键选'吃掉这个文件'。")
+            return
+        self._do_eat(path, size)
+
+    def _do_eat(self, path: Path, size: int) -> None:
+        kind = pet_tools.classify_file(path)
+        ok = pet_tools.send_to_recycle_bin(path) if sys.platform.startswith("win") else False
+        if not ok:
+            self.bubble_text = "吃不下……放不进回收站。"
+            self.bubble_timer = 140
+            return
+        self._recycle_ignore_until = time.monotonic() + 12
+        _bid, text = self.brain.on_eat(size, kind, path.name)
+        self.bubble_text = text
+        self.bubble_timer = 160
+        try:
+            self.brain.save(self.profile_path)
+        except Exception:
+            pass
+
+    def _eat_pending_file(self) -> None:
+        if not self._pending_file:
+            return
+        path = Path(self._pending_file["path"])
+        self._clear_pending_file()
+        if not path.exists():
+            self.bubble_text = "咦，文件不见了？"
+            self.bubble_timer = 120
+            return
+        self._feed_file(path, confirmed=True)
+
+    def _repair_via_dialog(self) -> None:
+        path = filedialog.askopenfilename(title="让它修个文件（图片 / 压缩包 / 文本）")
+        if path:
+            self._repair_file(Path(path))
+
+    def _repair_pending_file(self) -> None:
+        if not self._pending_file:
+            return
+        path = Path(self._pending_file["path"])
+        self._clear_pending_file()
+        if not path.exists():
+            self.bubble_text = "咦，文件不见了？"
+            self.bubble_timer = 120
+            return
+        self._repair_file(path)
+
+    def _repair_file(self, path: Path) -> None:
+        if pet_tools is None:
+            self.bubble_text = "缺少 pet_tools.py，修不了。"
+            self.bubble_timer = 120
+            return
+        if self._repair_busy:
+            self.bubble_text = "还在修上一个呢，等会儿～"
+            self.bubble_timer = 120
+            return
+        self._repair_busy = True
+        self._repair_result: dict | None = None
+        self._repair_started = time.monotonic()
+        self.bubble_text = self.brain.on_repair_start()
+        self.bubble_timer = 160
+
+        def _work() -> None:
+            try:
+                self._repair_result = pet_tools.repair_file(path)
+            except Exception:
+                self._repair_result = {"ok": False, "kind": "other", "out": None,
+                                       "already_ok": False, "note": "修的时候出错了。"}
+
+        threading.Thread(target=_work, daemon=True).start()
+        self.root.after(120, self._check_repair_done)
+
+    def _check_repair_done(self) -> None:
+        if self._repair_result is None:
+            if self._repair_busy and time.monotonic() - self._repair_started < 30:
+                self.root.after(120, self._check_repair_done)
+            elif self._repair_busy:
+                self._repair_busy = False
+                self.bubble_text = "修得有点久，先算了。"
+                self.bubble_timer = 140
+            return
+        self._finish_repair(self._repair_result)
+
+    def _finish_repair(self, result: dict) -> None:
+        self._repair_busy = False
+        _bid, text = self.brain.on_repair(result)
+        self.bubble_text = text
         self.bubble_timer = 200
+        try:
+            self.brain.save(self.profile_path)
+        except Exception:
+            pass
+
+    def _cancel_pending(self) -> None:
+        had = False
+        if self.brain.pending_meal:
+            self.brain.cancel_pending_meal()
+            had = True
+        if self._pending_file:
+            self._clear_pending_file()
+            had = True
+        self.bubble_text = "好吧，不吃了。" if had else "没什么要不吃的呀。"
+        self.bubble_timer = 120
+
+    def _poll_recycle_bin(self) -> None:
+        try:
+            if pet_tools is not None:
+                now = time.monotonic()
+                if self.brain.pending_meal and now - self.brain.pending_meal_at > 60:
+                    self.brain.cancel_pending_meal()
+                    self.bubble_text = "算了，不吃了。"
+                    self.bubble_timer = 120
+                if self._pending_file and now - self._pending_file.get("at", 0) > 60:
+                    self._clear_pending_file()
+                    self.bubble_text = "算了，先放着～"
+                    self.bubble_timer = 120
+                items = pet_tools.find_recycle_bin_items()
+                for it in items:
+                    if it["info_path"] not in self._recycle_seen:
+                        self._recycle_seen.add(it["info_path"])
+                        if now < self._recycle_ignore_until:
+                            continue
+                        self._recycle_queue.append(it)
+                if not self.brain.pending_meal and self._recycle_queue:
+                    self._handle_recycle_item(self._recycle_queue.pop(0))
+        except Exception:
+            pass
+        self.root.after(pet_tools.RECYCLE_POLL_SECONDS * 1000, self._poll_recycle_bin)
+
+    def _handle_recycle_item(self, item: dict) -> None:
+        size = item["size"]
+        kind = pet_tools.classify_file(Path(item["path"]))
+        name = item.get("name") or Path(item["path"]).name
+        if self.brain.fullness >= FULLNESS_REFUSE:
+            self.bubble_text = "唔，肚子还鼓着呢，这顿先不吃了。"
+            self.bubble_timer = 140
+            return
+        if size > ASK_MB * 1024 * 1024:
+            item = dict(item)
+            item["kind"] = kind
+            item["name"] = name
+            ask = self.brain.set_pending_meal(item)
+            self.bubble_text = ask + "点我一下就是'吃吧'！"
+            self.bubble_timer = 220
+            return
+        _bid, text = self.brain.on_eat(size, kind, name)
+        self.bubble_text = text
+        self.bubble_timer = 160
+        try:
+            self.brain.save(self.profile_path)
+        except Exception:
+            pass
+
+    def _show_profile(self) -> None:
+        messagebox.showinfo(
+            f"性格卡 · {self.name}",
+            describe_personality(self.brain.profile) + "\n\n" + self.brain.status_line())
 
     def _reroll(self) -> None:
         profile = roll_personality()
@@ -301,6 +562,17 @@ class DesktopSpriteApp:
     def _maybe_poke(self, seq: int) -> None:
         if seq != self._click_seq:
             return  # 期间来了双击，这一下不算戳
+        if self.brain.pending_meal:
+            result = self.brain.confirm_pending_meal()
+            if result:
+                _bid, text = result
+                self.bubble_text = text
+                self.bubble_timer = 160
+                try:
+                    self.brain.save(self.profile_path)
+                except Exception:
+                    pass
+            return
         _bid, text = self.brain.on_poke()
         self.bubble_text = text
         self.bubble_timer = 110
@@ -373,6 +645,9 @@ class DesktopSpriteApp:
             dy = reach * 4.0
         elif self.state == "computer":
             dy = math.sin(t * 3.0) * 1.5
+        elif self.state == "repairing":
+            angle = math.sin(t * 3.0) * 4.0
+            dy = math.sin(t * 3.0) * 2.0
         elif self.state == "playing":
             dy = -abs(math.sin(t * 2.0)) * 8
 
@@ -455,6 +730,10 @@ class DesktopSpriteApp:
             bx = cx + int(math.sin(t * 1.2) * 66)
             by = shadow_y - 8 - int(abs(math.sin(t * 2.0)) * 32)
             self.canvas.create_oval(bx - 9, by - 9, bx + 9, by + 9, fill="#ffce50", outline="#fff3b0", width=2)
+        elif self.state == "repairing":
+            hx, hy = cx + 58, shadow_y - 26
+            self.canvas.create_line(hx, hy + 14, hx + 6, hy - 6, fill="#8a5a2b", width=5)
+            self.canvas.create_rectangle(hx - 4, hy - 12, hx + 16, hy - 2, fill="#9aa3ad", outline="#5f6b76", width=2)
         elif self.state == "walking":
             for foot in (-13, 13):
                 fx = cx + foot + int(math.sin(t * 4) * 5)

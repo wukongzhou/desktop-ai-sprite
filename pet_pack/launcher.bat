@@ -13,6 +13,7 @@ if errorlevel 1 (
   exit /b
 )
 %PYCMD% -c "import PIL" 2>nul || %PYCMD% -m pip install pillow
+%PYCMD% -m pip install --timeout 15 tkinterdnd2 >nul 2>&1
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0创建快捷方式.ps1" -Action install -Dir "%~dp0"
 where pythonw >nul 2>&1
 if errorlevel 1 (

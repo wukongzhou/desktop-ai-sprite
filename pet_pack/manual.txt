@@ -19,7 +19,7 @@ Desktop Sprite {PET_NAME} · Installation Manual
 三、安装步骤 | Install
 1. 把安装包解压到任意文件夹（单独一个文件夹，别直接放桌面根目录）/ Extract the ZIP to any folder.
 2. 双击「启动精灵.bat」/ Double-click 启动精灵.bat.
-3. 第一次启动会自动：装好 Pillow、在桌面建一个精灵图标、加入开机启动。/ First launch automatically installs Pillow, creates a desktop icon, and adds the pet to startup.
+3. 第一次启动会自动：装好 Pillow 和拖放组件、在桌面建一个精灵图标、加入开机启动。/ First launch automatically installs Pillow, creates a desktop icon, and adds the pet to startup.
 4. 精灵出现在桌面右下角，开始自己活动。/ The sprite appears at the bottom-right of your desktop and starts moving on its own.
 
 四、怎么玩 | How to play
@@ -40,3 +40,11 @@ Desktop Sprite {PET_NAME} · Installation Manual
 - 精灵不见了：它可能睡着在角落，或被别的窗口盖住了；重启一次桌宠。/ Pet missing: it may be sleeping in a corner or behind a window; relaunch it.
 - 卸载：删掉整个文件夹，再把桌面图标和开机启动里的「桌面精灵」快捷方式删掉即可。/ To uninstall: delete the folder, plus the desktop icon and the Startup shortcut.
 - 桌宠不会说话，它用气泡和动作跟你交流。/ The pet doesn't talk; it communicates with bubbles and gestures.
+
+八、喂它吃文件 / 让它修文件 | Feed & Repair
+- 删文件时它会自己发现（监听回收站），小文件直接吃掉，大文件先问你。/ When you delete a file, it notices (watches the Recycle Bin): small files are eaten right away, big ones need your OK.
+- 把文件拖到精灵身上，右键选“吃掉这个文件”或“修修这个文件”。/ Drag a file onto the pet, then right-click → "Eat it" or "Fix it".
+- 也可以右键菜单直接选“喂它吃个文件…”或“让它修个文件…”。/ Or use the right-click menu → "Feed it a file..." / "Fix a file...".
+- 吃 = 移进回收站，可恢复；大文件、吃撑了会先问你。/ Eating = move to Recycle Bin (recoverable); it asks first for big files and refuses when full.
+- 能修的：图片重新编码、zip 抢救、文本转码；修不好它会委屈脸认栽。/ It can fix: image re-encode, ZIP salvage, text re-encode. If it can't, it admits it with a sad face.
+- 拖放需要 tkinterdnd2：第一次启动会自动装（装不上也不影响，右键菜单一样能用）。/ Drag-and-drop needs tkinterdnd2 (auto-installed on first launch; the right-click menu works without it).

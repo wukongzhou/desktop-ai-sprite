@@ -85,6 +85,13 @@ LINES = {
     "ai_motion": ["看我的绝活！", "（表演时间）"],
     "pickup": ["发现了一个小东西！", "我来拿一下～"],
     "playing": ["自己玩球也很开心！", "接住！"],
+    "eating": ["（大口大口）好吃！", "嘎吱嘎吱……真香！", "（鼓着腮帮子）嗯嗯！"],
+    "overstuffed": ["（躺平）吃撑了……动不了了……", "肚子好鼓……让我躺一会儿……"],
+    "repairing": ["（掏出小锤子）捣鼓捣鼓……", "让我看看哪里坏了……", "（翻工具箱）扳手呢，扳手呢……"],
+    "repair_ok": ["修好啦！我厉害吧！🔧", "搞定！这点小毛病难不倒我！"],
+    "repair_fail": ["呜……这个我真修不好……", "（委屈脸）我尽力了，真的修不好……"],
+    "refuse_eat": ["吃不下了……肚子还鼓着呢……", "不行不行，再吃要爆炸了！"],
+    "ask_meal": ["这个好大……真的要我吃吗？", "唔，这个分量有点吓人，吃还是不吃？"],
     "wake_up": ["唔……谁叫我？", "（揉眼睛）几点了？"],
     "dazed": ["（晕乎乎）转得我头都晕了……", "哎哟，轻点放我下来嘛。"],
     "cheered": ["嘿嘿，被哄开心啦！", "（蹭蹭）再哄一下嘛～"],
@@ -114,6 +121,16 @@ QUIRK_LINES = {
 }
 
 
+ASK_MB = 50
+OVERSTUFF_MB = 500
+FULLNESS_REFUSE = 90
+
+
+def fullness_gain(size: int) -> int:
+    """吃一口涨多少饱腹：小零食 +5，大餐最多 +40。"""
+    return 5 + min(35, size // (10 * 1024 * 1024))
+
+
 # ---------------------------------------------------------------- 行为表
 # weight：基础权重；duration：持续秒数范围；mood：结束时的心情变化。
 BEHAVIORS = {
@@ -130,6 +147,9 @@ BEHAVIORS = {
     "shy_hide":       {"weight": 2,  "duration": (3.0, 6.0), "mood": {"happy": -1}},
     "dance":          {"weight": 2,  "duration": (3.0, 5.0), "mood": {"happy": +4, "energy": -3}},
     "ai_motion":      {"weight": 4,  "duration": (3.0, 3.0), "mood": {"happy": +3}},
+    "eating":         {"weight": 0,  "duration": (2.0, 3.0), "mood": {"happy": +4}},
+    "overstuffed":    {"weight": 0,  "duration": (8.0, 15.0), "mood": {"energy": +10}},
+    "repairing":      {"weight": 0,  "duration": (3.0, 6.0), "mood": {}},
     # 手动动作：权重 0，大脑不会自己选，只能右键菜单点
     "pickup":         {"weight": 0,  "duration": (3.0, 6.0), "mood": {}},
     "playing":        {"weight": 0,  "duration": (3.0, 6.0), "mood": {"happy": +2}},
@@ -156,13 +176,16 @@ class Brain:
         self.fullness = 60.0   # 阶段一只有“找零食”行为用到；吃文件是阶段二
         self.curiosity = 50.0
         # 统计
-        self.stats = {"pokes": 0, "pets": 0, "drags": 0, "wake_ups": 0}
+        self.stats = {"pokes": 0, "pets": 0, "drags": 0, "wake_ups": 0,
+                      "meals": 0, "repairs_ok": 0, "repairs_fail": 0}
         # 行为状态
         self.current = "idle_look"
         self.behavior_t = 0.0
         self.behavior_duration = 3.0
         self.roam = False      # 手动巡游开关：开着时多走路、少睡觉
         self._pokes_window: list[float] = []  # 最近戳击的时间戳（防暴躁）
+        self.pending_meal: dict | None = None  # 回收站大件：等主人点头才吃
+        self.pending_meal_at = 0.0
         self._last_sleep = False
 
     # ---------------------------------------------------------- 权重
@@ -314,6 +337,62 @@ class Brain:
             return "stretch", self.bubble_for("stretch")
         self.force("sleep")
         return "sleep", self.bubble_for("sleep")
+
+    # ---------------------------------------------------------- 阶段二：吃文件 / 修文件
+    def on_eat(self, size_bytes: int, kind: str = "other", name: str = "") -> tuple[str, str]:
+        """吃掉一个文件。返回（行为，气泡）。"""
+        if self.fullness >= FULLNESS_REFUSE:
+            self._start("grumpy")
+            return "grumpy", self.rng.choice(LINES["refuse_eat"])
+        self.stats["meals"] += 1
+        label = name or {"image": "一张图", "zip": "一个压缩包", "text": "一篇文章"}.get(kind, "一个文件")
+        if size_bytes > OVERSTUFF_MB * 1024 * 1024:
+            self.fullness = 100.0
+            self._start("overstuffed")
+            return "overstuffed", self.rng.choice(LINES["overstuffed"])
+        gain = fullness_gain(size_bytes)
+        self.fullness = _clamp(self.fullness + gain)
+        self._start("eating")
+        return "eating", f"（大口大口）{label}真香！"
+
+    def set_pending_meal(self, item: dict) -> str:
+        """回收站里来了个大件：先问主人，点了才吃。"""
+        self.pending_meal = dict(item)
+        self.pending_meal_at = time.monotonic()
+        return self.rng.choice(LINES["ask_meal"])
+
+    def confirm_pending_meal(self) -> tuple[str, str] | None:
+        if not self.pending_meal:
+            return None
+        item = self.pending_meal
+        self.pending_meal = None
+        return self.on_eat(item["size"], item.get("kind", "other"), item.get("name", ""))
+
+    def cancel_pending_meal(self) -> str:
+        self.pending_meal = None
+        return "好吧，不吃了。"
+
+    def on_repair_start(self) -> str:
+        self._start("repairing")
+        return self.rng.choice(LINES["repairing"])
+
+    def on_repair(self, result: dict) -> tuple[str, str]:
+        if result.get("ok"):
+            self.stats["repairs_ok"] += 1
+            self._start("excited")
+            if result.get("already_ok"):
+                return "excited", "检查过了，这个本来就是好的，不用修～"
+            out = result.get("out") or ""
+            name = Path(out).name if out else ""
+            return "excited", f"修好啦！存成{name}啦！"
+        self.stats["repairs_fail"] += 1
+        self._start("grumpy")
+        return "grumpy", self.rng.choice(LINES["repair_fail"])
+
+    def status_line(self) -> str:
+        return (f"饱腹 {self.fullness:.0f}% · 吃过 {self.stats['meals']} 个文件 · "
+                f"修好 {self.stats['repairs_ok']} 个")
+
 
     # ---------------------------------------------------------- 持久化
     def to_dict(self) -> dict:
