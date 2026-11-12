@@ -15,6 +15,35 @@ import random
 import time
 from pathlib import Path
 
+try:
+    from pet_memory import Memory
+except Exception:
+    Memory = None
+
+
+class _NullMemory:
+    """pet_memory.py 缺失时的空壳：记不住，但不崩。"""
+    owner_name = None
+    facts: list = []
+
+    def teach(self, text):
+        return None, "我还没法记东西（缺少 pet_memory.py）。"
+
+    def note_event(self, kind, data=None):
+        pass
+
+    def recall(self, rng):
+        return None
+
+    def habits(self):
+        return []
+
+    def summary(self):
+        return ""
+
+    def save(self, path=None):
+        pass
+
 # ---------------------------------------------------------------- 性格
 TRAIT_LABELS = {
     "sociable": "外向",
@@ -88,6 +117,8 @@ LINES = {
     "eating": ["（大口大口）好吃！", "嘎吱嘎吱……真香！", "（鼓着腮帮子）嗯嗯！"],
     "overstuffed": ["（躺平）吃撑了……动不了了……", "肚子好鼓……让我躺一会儿……"],
     "repairing": ["（掏出小锤子）捣鼓捣鼓……", "让我看看哪里坏了……", "（翻工具箱）扳手呢，扳手呢……"],
+    "recall": ["（想了想）啊，我想起一件事……", "（挠挠头）对了对了……"],
+    "screen_slam": ["（咚咚咚！）看我看我！", "（使劲砸屏幕）主人！看这里！", "咚！咚！在吗在吗？"],
     "repair_ok": ["修好啦！我厉害吧！🔧", "搞定！这点小毛病难不倒我！"],
     "repair_fail": ["呜……这个我真修不好……", "（委屈脸）我尽力了，真的修不好……"],
     "refuse_eat": ["吃不下了……肚子还鼓着呢……", "不行不行，再吃要爆炸了！"],
@@ -174,6 +205,8 @@ BEHAVIORS = {
     "eating":         {"weight": 0,  "duration": (2.0, 3.0), "mood": {"happy": +4}},
     "overstuffed":    {"weight": 0,  "duration": (8.0, 15.0), "mood": {"energy": +10}},
     "repairing":      {"weight": 0,  "duration": (3.0, 6.0), "mood": {}},
+    "recall":         {"weight": 2,  "duration": (3.0, 5.0), "mood": {}},
+    "screen_slam":    {"weight": 2,  "duration": (1.5, 2.5), "mood": {"happy": +2}},
     # 手动动作：权重 0，大脑不会自己选，只能右键菜单点
     "pickup":         {"weight": 0,  "duration": (3.0, 6.0), "mood": {}},
     "playing":        {"weight": 0,  "duration": (3.0, 6.0), "mood": {"happy": +2}},
@@ -188,7 +221,7 @@ class Brain:
     """心情 + 行为调度。所有随机都走 self.rng，方便测试复现。"""
 
     def __init__(self, profile: dict, rng: random.Random | None = None,
-                 has_ai_motion: bool = False):
+                 has_ai_motion: bool = False, memory_path: str | Path | None = None):
         self.profile = profile
         self.rng = rng or random.Random()
         self.has_ai_motion = has_ai_motion
@@ -202,7 +235,8 @@ class Brain:
         # 统计
         self.stats = {"pokes": 0, "pets": 0, "drags": 0, "wake_ups": 0,
                       "meals": 0, "repairs_ok": 0, "repairs_fail": 0,
-                      "head_pats": 0}
+                      "head_pats": 0,
+                      "lessons": 0}
         # 行为状态
         self.current = "idle_look"
         self.behavior_t = 0.0
@@ -215,6 +249,7 @@ class Brain:
         self.emotion_t = 0.0
         self.emotion_duration = self.rng.uniform(*EMOTIONS[self.emotion]["duration"])
         self.emotion_changed = False
+        self.memory = self._load_memory(memory_path)
         self._last_sleep = False
 
     # ---------------------------------------------------------- 权重
@@ -347,6 +382,10 @@ class Brain:
 
     # ---------------------------------------------------------- 文案
     def bubble_for(self, bid: str) -> str:
+        if bid == "recall" and self.memory is not None:
+            mention = self.memory.recall(self.rng)
+            if mention and self.rng.random() < 0.85:
+                return mention
         pool = list(LINES.get(bid, LINES["idle_look"]))
         if bid == "idle_look" and self.rng.random() < 0.5:
             pool = pool + EMOTION_LINES[self.emotion]
@@ -365,6 +404,7 @@ class Brain:
         self._pokes_window = [t for t in self._pokes_window if now - t < 4.0]
         self._pokes_window.append(now)
         self.stats["pokes"] += 1
+        self.note_event("poke")
         if self.current == "sleep":
             self.stats["wake_ups"] += 1
             self.energy = _clamp(self.energy + 5)
@@ -393,6 +433,7 @@ class Brain:
     def on_double_click(self) -> str:
         """双击：说一句心里话。"""
         self.stats["pets"] += 1
+        self.note_event("ask")
         return self.rng.choice(LINES["thought"])
 
     def on_drag_end(self) -> tuple[str, str]:
@@ -402,6 +443,7 @@ class Brain:
 
     def on_cheer(self) -> str:
         """哄它一下。"""
+        self.note_event("cheer")
         self.happy = _clamp(self.happy + 20)
         self._start("excited")
         return self.bubble_for("cheered")
@@ -420,6 +462,8 @@ class Brain:
             self._start("grumpy")
             return "grumpy", self.rng.choice(LINES["refuse_eat"])
         self.stats["meals"] += 1
+        self.note_event("fed", {"ext": Path(name).suffix.lower() if name else "",
+                               "file_kind": kind})
         label = name or {"image": "一张图", "zip": "一个压缩包", "text": "一篇文章"}.get(kind, "一个文件")
         if size_bytes > OVERSTUFF_MB * 1024 * 1024:
             self.fullness = 100.0
@@ -452,6 +496,7 @@ class Brain:
         return self.rng.choice(LINES["repairing"])
 
     def on_repair(self, result: dict) -> tuple[str, str]:
+        self.note_event("repair", {"file_kind": result.get("kind")})
         if result.get("ok"):
             self.stats["repairs_ok"] += 1
             self._start("excited")
@@ -465,9 +510,11 @@ class Brain:
         return "grumpy", self.rng.choice(LINES["repair_fail"])
 
     def status_line(self) -> str:
+        learned = (f" · 记了 {len(self.memory.facts)} 件事"
+                   if self.memory is not None and self.memory.facts else "")
         return (f"现在{EMOTION_LABELS[self.emotion]} · "
                 f"饱腹 {self.fullness:.0f}% · 吃过 {self.stats['meals']} 个文件 · "
-                f"修好 {self.stats['repairs_ok']} 个")
+                f"修好 {self.stats['repairs_ok']} 个{learned}")
     # ---------------------------------------------------------- 随机情绪 + 主人互动
     def _roll_emotion(self) -> str:
         """掷一个新情绪：基础权重 + 性格加成（傲娇值高容易傲娇，胆大容易兴奋）。"""
@@ -490,20 +537,63 @@ class Brain:
     def on_pet(self) -> tuple[str, str]:
         """摸摸头：开心 +10。"""
         self.stats["head_pats"] += 1
+        self.note_event("pat")
         self.happy = _clamp(self.happy + 10)
         self._start("excited")
         return "excited", self.rng.choice(LINES["petted"])
 
     def on_play(self) -> tuple[str, str]:
         """陪它玩一会儿：玩球。"""
+        self.note_event("play")
         self._start("playing")
         return "playing", self.rng.choice(LINES["playing"])
 
     def on_ask(self) -> str:
-        """问问它在想什么：一半说心里话，一半反问主人。"""
+        """问问它在想什么：有记忆时偶尔翻一条出来，不然说心里话或反问主人。"""
+        if self.memory is not None and self.rng.random() < 0.4:
+            mention = self.memory.recall(self.rng)
+            if mention:
+                return mention
         if self.rng.random() < 0.5:
             return self.rng.choice(LINES["thought"])
         return self.rng.choice(LINES["ask_owner"])
+    # ---------------------------------------------------------- 学习功能
+    def _load_memory(self, memory_path):
+        if Memory is None:
+            return _NullMemory()
+        return Memory.load(memory_path)
+
+    def save_memory(self) -> None:
+        try:
+            self.memory.save()
+        except Exception:
+            pass
+
+    def owner_name(self) -> str:
+        return (self.memory.owner_name if self.memory is not None else None) or "主人"
+
+    def note_event(self, kind: str, data: dict | None = None) -> None:
+        if self.memory is None:
+            return
+        try:
+            self.memory.note_event(kind, data)
+        except Exception:
+            pass
+
+    def on_teach(self, text: str) -> tuple[str, str]:
+        """教它一句话：记下来，回复一句。"""
+        _entry, reply = self.memory.teach(text)
+        self.stats["lessons"] += 1
+        self.note_event("teach")
+        self._start("excited")
+        return "excited", reply
+
+    def on_slam(self) -> tuple[str, str]:
+        """使劲砸屏幕要 attention：动漫脸，不说话。"""
+        self._start("screen_slam")
+        return "screen_slam", self.rng.choice(LINES["screen_slam"])
+
+
 
 
 
@@ -522,8 +612,10 @@ class Brain:
         }
 
     @classmethod
-    def from_dict(cls, data: dict, rng=None, has_ai_motion: bool = False) -> "Brain":
-        brain = cls(data["profile"], rng=rng, has_ai_motion=has_ai_motion)
+    def from_dict(cls, data: dict, rng=None, has_ai_motion: bool = False,
+                  memory_path: str | Path | None = None) -> "Brain":
+        brain = cls(data["profile"], rng=rng, has_ai_motion=has_ai_motion,
+                    memory_path=memory_path)
         for k, v in data.get("moods", {}).items():
             if hasattr(brain, k):
                 setattr(brain, k, float(v))
@@ -535,13 +627,15 @@ class Brain:
             json.dumps(self.to_dict(), ensure_ascii=False, indent=2), encoding="utf-8")
 
     @classmethod
-    def load(cls, path: str | Path, rng=None, has_ai_motion: bool = False) -> "Brain | None":
+    def load(cls, path: str | Path, rng=None, has_ai_motion: bool = False,
+             memory_path: str | Path | None = None) -> "Brain | None":
         p = Path(path)
         if not p.exists():
             return None
         try:
             return cls.from_dict(json.loads(p.read_text(encoding="utf-8")),
-                                 rng=rng, has_ai_motion=has_ai_motion)
+                                 rng=rng, has_ai_motion=has_ai_motion,
+                                 memory_path=memory_path)
         except Exception:
             return None
 

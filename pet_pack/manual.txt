@@ -54,3 +54,10 @@ Desktop Sprite {PET_NAME} · Installation Manual
 - 鼠标一分钟没动，它自己走过来问“主人，你在干嘛呀？”/ If you leave the mouse alone for a minute, it walks over and asks what you're up to.
 - 右键菜单：摸摸头（它超开心）、陪它玩一会儿、问问它在想什么。/ Right-click menu: pat its head, play with it, ask what it's thinking.
 - 戳它的反应看它现在什么情绪：委屈时戳它更委屈，开心时戳它更兴奋。/ How it reacts to pokes depends on its mood: poking it while sad makes it sadder, while happy makes it more excited.
+
+十、学习功能：教它、记事、习惯 | Learning & Memory
+- 右键菜单“教它一句话…”：教它点什么，比如“我喜欢喝咖啡”“我叫亮哥”“我每天 9 点上班”，它就记住了。/ Right-click → "Teach it a sentence...": teach it things like "I like coffee", "Call me Liang", "I start work at 9 every day" — it remembers.
+- 右键菜单“它记得什么？”：列出它记住的事和主人的习惯。/ "What does it remember?": lists everything it learned and your habits.
+- 它自己也会观察：你常喂它什么、常让它修什么、总在几点找它，都攒成习惯。/ It also watches on its own: what you feed it, what you ask it to fix, when you come play — and turns them into habits.
+- 记忆存在 pet_memory.json 里，跟着精灵走；换性格也不丢。/ Memories live in pet_memory.json and travel with the pet; they survive a personality change.
+- 老实话：它是按固定句式听的（我喜欢/我不喜欢/我叫/我每天几点），不是大模型；听不懂的原样记下来。真要自由对话理解，得接本地小模型。/ Honest note: it understands fixed patterns (I like / I don't like / call me / every day at ...), not free conversation. Real free-form understanding needs a local small model.

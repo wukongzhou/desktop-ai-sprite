@@ -1,4 +1,4 @@
-"""desktop_pet.py v3.3 — 拟人化桌宠（阶段二补丁：随机情绪 + 主人互动）。
+"""desktop_pet.py v3.5 — 拟人化桌宠（学习功能 + 砸屏幕对话框）。
 
 在 v2 的透明窗、拖拽、右键菜单、AI 动作循环基础上，接上 pet_brain：
 精灵自己随机动（走、跳、睡、发呆、凑近鼠标、假装忙……），心情值涨跌，
@@ -23,7 +23,7 @@ import threading
 import time
 import tkinter as tk
 from pathlib import Path
-from tkinter import filedialog, messagebox
+from tkinter import filedialog, messagebox, simpledialog
 from PIL import Image, ImageOps, ImageTk
 
 ROOT = Path(__file__).parent
@@ -36,6 +36,11 @@ try:
     import pet_tools
 except Exception:
     pet_tools = None
+
+try:
+    import pet_memory
+except Exception:
+    pet_memory = None
 
 try:
     from tkinterdnd2 import TkinterDnD, DND_FILES
@@ -55,6 +60,7 @@ RENDER_STATE = {
     "shy_hide": "walking", "dance": "happy", "ai_motion": "ai_motion",
     "pickup": "pickup", "playing": "playing",
     "eating": "happy", "overstuffed": "sleepy", "repairing": "repairing",
+    "screen_slam": "slam",
 }
 # 渲染分支 -> 大脑行为 id（右键菜单手动点）
 BEHAVIOR_FOR_STATE = {v: k for k, v in RENDER_STATE.items()}
@@ -80,15 +86,16 @@ class DesktopSpriteApp:
         self.scale = max(0.4, min(2.5, scale))
         self.base_size = int(220 * self.scale)
         self.profile_path = Path(profile_path)
+        self.memory_path = self.profile_path.with_name("pet_memory.json")
 
         # ---- 性格档案：有就读，没有（或要求重掷）就掷一个并存下来
-        brain = Brain.load(self.profile_path)
+        brain = Brain.load(self.profile_path, memory_path=self.memory_path)
         fresh_profile = brain is None or new_personality
         if brain is None or new_personality:
             profile = roll_personality()
             if name:
                 profile["name"] = name
-            brain = Brain(profile)
+            brain = Brain(profile, memory_path=self.memory_path)
             brain.save(self.profile_path)
             print("新精灵诞生：", describe_personality(profile))
         elif name:
@@ -171,6 +178,9 @@ class DesktopSpriteApp:
         self._menu_fix_label = "🔧 修修这个文件"
         self._last_pointer = (0, 0)
         self._pointer_idle_since = time.monotonic()
+        self._bubble_scale = 1.0
+        self._bubble_text_shown = ""
+        self._slam_sounded = False
 
         self.bubble_text = f"嗨！我是{self.name} ✨"
         self.bubble_timer = 110
@@ -233,6 +243,9 @@ class DesktopSpriteApp:
         self.menu.add_command(label="🤲 摸摸头", command=self._pet_head)
         self.menu.add_command(label="⚽ 陪它玩一会儿", command=self._play_with)
         self.menu.add_command(label="💬 问问它在想什么", command=self._ask_it)
+        if pet_memory is not None:
+            self.menu.add_command(label="📖 教它一句话…", command=self._teach_via_dialog)
+            self.menu.add_command(label="🧠 它记得什么？", command=self._show_memory)
         self.menu.add_command(label="💤 睡觉 / 叫醒", command=self._toggle_sleep)
         self.menu.add_command(label="🪪 看看性格卡", command=self._show_profile)
         self.menu.add_command(label="🎲 换个性格（重掷）", command=self._reroll)
@@ -278,6 +291,41 @@ class DesktopSpriteApp:
     def _ask_it(self) -> None:
         self.bubble_text = self.brain.on_ask()
         self.bubble_timer = 200
+
+    # ---------------------------------------------------------- 学习功能
+    def _teach_via_dialog(self) -> None:
+        text = simpledialog.askstring("教它一句话", "教它点什么？比如：我喜欢喝咖啡、我叫亮哥、我每天 9 点上班")
+        if text:
+            self._teach_text(text)
+
+    def _teach_text(self, text: str) -> None:
+        _bid, reply = self.brain.on_teach(text)
+        self.bubble_text = reply
+        self.bubble_timer = 200
+        self.brain.save_memory()
+
+    def _show_memory(self) -> None:
+        summary = self.brain.memory.summary()
+        messagebox.showinfo(
+            f"它记得的事 · {self.name}",
+            summary if summary else "我还什么都没记住呢，教教我吧～")
+
+    # ---------------------------------------------------------- 砸屏幕
+    def _play_thud(self) -> None:
+        """砸屏幕的“咚咚”声（低频两下，线程里响，不卡画面）。非 Windows 没声。"""
+        if not sys.platform.startswith("win"):
+            return
+
+        def _beep() -> None:
+            try:
+                import winsound
+                winsound.Beep(110, 130)
+                winsound.Beep(90, 100)
+            except Exception:
+                pass
+
+        threading.Thread(target=_beep, daemon=True).start()
+
 
 
     def _toggle_sleep(self) -> None:
@@ -544,7 +592,8 @@ class DesktopSpriteApp:
     def _reroll(self) -> None:
         profile = roll_personality()
         old_name = self.brain.name
-        self.brain = Brain(profile, has_ai_motion=bool(self.animation_frames))
+        self.brain = Brain(profile, has_ai_motion=bool(self.animation_frames),
+                           memory_path=self.memory_path)
         self.brain.save(self.profile_path)
         self.name = self.brain.name
         self.root.title(f"桌面精灵 - {self.name}")
@@ -609,6 +658,7 @@ class DesktopSpriteApp:
     def _on_close(self) -> None:
         try:
             self.brain.save(self.profile_path)
+            self.brain.save_memory()
         except Exception:
             pass
         self.root.destroy()
@@ -622,6 +672,7 @@ class DesktopSpriteApp:
         if changed:
             self.bubble_text = self.brain.bubble_for(self.brain.current)
             self.bubble_timer = 110
+            self._slam_sounded = False
         if self.brain.emotion_changed:
             self.brain.emotion_changed = False
             self.bubble_text = self.brain.emotion_line()
@@ -639,7 +690,7 @@ class DesktopSpriteApp:
               and not self.brain.pending_meal and not self._pending_file):
             self._pointer_idle_since = time.monotonic()
             self.brain.force("curious_approach")
-            self.bubble_text = "主人，你在干嘛呀？"
+            self.bubble_text = f"{self.brain.owner_name()}，你在干嘛呀？"
             self.bubble_timer = 160
         self.state = RENDER_STATE.get(self.brain.current, "idle")
 
@@ -688,8 +739,30 @@ class DesktopSpriteApp:
         elif self.state == "repairing":
             angle = math.sin(t * 3.0) * 4.0
             dy = math.sin(t * 3.0) * 2.0
+        elif self.state == "slam":
+            bt = self.brain.behavior_t
+            if bt < 0.3:
+                # 蓄力：往后仰
+                sy = 1.0 + min(0.12, bt * 0.4)
+                sx = 1.0 - min(0.08, bt * 0.3)
+                dy = -6.0
+                angle = -8.0
+            elif bt < 0.7:
+                # 砸下去：压扁 + 抖
+                sy = 0.78
+                sx = 1.12
+                dy = 10.0
+                angle = math.sin(t * 30.0) * 5.0
+            else:
+                # 回弹
+                sy = 1.0 + math.sin(t * 2.0) * 0.05
+                dy = -4.0
         elif self.state == "playing":
             dy = -abs(math.sin(t * 2.0)) * 8
+        # 砸屏幕的“咚咚”声：只响一次（低频，两下）
+        if self.state == "slam" and 0.3 <= self.brain.behavior_t < 0.4 and not self._slam_sounded:
+            self._slam_sounded = True
+            self._play_thud()
 
         # ---- 移动：走路 / 巡游 / 凑近鼠标 / 躲起来
         screen_w = self.root.winfo_screenwidth()
@@ -774,20 +847,37 @@ class DesktopSpriteApp:
             hx, hy = cx + 58, shadow_y - 26
             self.canvas.create_line(hx, hy + 14, hx + 6, hy - 6, fill="#8a5a2b", width=5)
             self.canvas.create_rectangle(hx - 4, hy - 12, hx + 16, hy - 2, fill="#9aa3ad", outline="#5f6b76", width=2)
+        elif self.state == "slam" and 0.3 <= self.brain.behavior_t < 0.9:
+            ix, iy = cx + 58, shadow_y - 30
+            for dx, dy2 in ((-18, -14), (0, -20), (18, -12), (-24, 4), (24, 2), (-12, 14), (12, 16)):
+                self.canvas.create_line(ix, iy, ix + dx, iy + dy2, fill="#ffd166", width=3)
+            self.canvas.create_oval(ix - 7, iy - 7, ix + 7, iy + 7, fill="#ff5d3b", outline="#fff1c7", width=2)
         elif self.state == "walking":
             for foot in (-13, 13):
                 fx = cx + foot + int(math.sin(t * 4) * 5)
                 self.canvas.create_oval(fx - 4, shadow_y - 3, fx + 4, shadow_y + 1, fill="#ffebbb", outline="")
 
-        # Draw speech bubble if active
+        # Draw speech bubble if active（动漫对话框：带尾巴，弹出来）
         if self.bubble_timer > 0:
             self.bubble_timer -= 1
-            self.canvas.create_rectangle(
-                14, 6, self.base_size + 46, 36, fill="#fff8ef", outline="#d8754e", width=2
-            )
-            self.canvas.create_text(
-                cx, 21, text=self.bubble_text, fill="#302a27", font=("Microsoft YaHei", 9, "bold")
-            )
+            if self.bubble_text != self._bubble_text_shown:
+                self._bubble_text_shown = self.bubble_text
+                self._bubble_scale = 0.0
+            self._bubble_scale = min(1.0, self._bubble_scale + 0.25)
+            s = self._bubble_scale
+            x0 = cx - int((cx - 14) * s)
+            x1 = cx + int((self.base_size + 46 - cx) * s)
+            y0 = 21 - int(15 * s)
+            y1 = 21 + int(15 * s)
+            self.canvas.create_rectangle(x0, y0, x1, y1, fill="#fff8ef", outline="#d8754e", width=2)
+            if s >= 0.9:
+                self.canvas.create_polygon(cx - 12, y1, cx + 12, y1, cx, 52,
+                                           fill="#fff8ef", outline="")
+                self.canvas.create_line(cx - 12, y1, cx, 52, fill="#d8754e", width=2)
+                self.canvas.create_line(cx + 12, y1, cx, 52, fill="#d8754e", width=2)
+            if s >= 0.7:
+                self.canvas.create_text(cx, 21, text=self.bubble_text, fill="#302a27",
+                                        font=("Microsoft YaHei", 9, "bold"))
 
         # 每 ~30 秒存一次档案（心情、被戳次数不断档）
         self._save_tick += 1
@@ -795,6 +885,7 @@ class DesktopSpriteApp:
             self._save_tick = 0
             try:
                 self.brain.save(self.profile_path)
+                self.brain.save_memory()
             except Exception:
                 pass
 

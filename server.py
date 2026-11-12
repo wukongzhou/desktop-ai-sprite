@@ -909,7 +909,7 @@ async def pet_pack(sprite_data: str = Form(...), animation_file: str = Form(""),
             anim_path = SPRITES_DIR / Path(animation_file).name
             if anim_path.exists() and anim_path.is_file():
                 zf.write(anim_path, "animation.webp")
-        for code_file in ("desktop_pet.py", "pet_brain.py", "pet_tools.py"):
+        for code_file in ("desktop_pet.py", "pet_brain.py", "pet_tools.py", "pet_memory.py"):
             code_path = ROOT / code_file
             if code_path.exists():
                 zf.write(code_path, code_file)
