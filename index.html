@@ -554,6 +554,20 @@
         <a href="/stats" target="_blank" class="text-xs font-bold text-[#d8653c] underline">📊 数据后台</a>
       </div>
       <p id="statsLine" class="mt-1 text-xs text-[#6d5d53]">正在加载访问数据…</p>
+      <div class="mt-3 flex flex-wrap items-center gap-2">
+        <button id="btnLike" type="button" class="rounded-xl bg-[#fdf0ea] border border-[#f0d5c8] px-4 py-2 text-xs font-bold text-[#c0532c]">🤍 点赞 <span id="likeCount">0</span></button>
+        <span id="likeHint" class="text-[11px] text-[#8b7d72]">喜欢这个小精灵工坊就点个赞～</span>
+        <span id="authBox" class="ml-auto flex flex-wrap items-center gap-2">
+          <span id="authState" class="text-[11px] text-[#8b7d72]">未登录</span>
+          <input id="authEmail" type="email" maxlength="120" placeholder="邮箱" class="rounded-xl border px-3 py-2 text-xs w-44">
+          <input id="authPassword" type="password" maxlength="128" placeholder="密码（至少 6 位）" class="rounded-xl border px-3 py-2 text-xs w-36">
+          <input id="authName" maxlength="20" placeholder="名字（可不填）" class="rounded-xl border px-3 py-2 text-xs w-28">
+          <button id="btnRegister" type="button" class="rounded-xl bg-[#2b2522] px-3 py-2 text-xs font-bold text-white">注册</button>
+          <button id="btnLogin" type="button" class="rounded-xl bg-[#eee4d7] px-3 py-2 text-xs font-bold text-[#3a312c]">登录</button>
+          <button id="btnLogout" type="button" class="rounded-xl bg-[#eee4d7] px-3 py-2 text-xs font-bold text-[#3a312c] hidden">退出</button>
+        </span>
+      </div>
+      <p id="authStatus" class="mt-2 min-h-4 text-xs text-[#8b4a32]"></p>
       <div class="mt-3 flex flex-wrap gap-2">
         <input id="commentName" maxlength="20" placeholder="你的名字（可不填）" class="rounded-xl border px-3 py-2 text-xs w-36">
         <input id="commentText" maxlength="200" placeholder="留句话吧，最多 200 字…" class="rounded-xl border px-3 py-2 text-xs flex-1 min-w-[180px]">
@@ -1909,7 +1923,7 @@
         // --- 使用统计 + 留言 ---
         async function recordStat(kind){ try { await fetch('/api/stats/event', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({kind})}); } catch (_) {} }
         recordStat('page_view');
-        async function loadStats(){ try { const r = await fetch('/api/stats/summary'); if (!r.ok) return; const d = await r.json(); const t = d.totals || {}; document.getElementById('statsLine').textContent = `已有 ${t.page_view||0} 次访问 · ${t.generate||0} 次生成 · ${t.share||0} 次分享 · ${t.download||0} 次下载 · ${d.comments||0} 条留言`; } catch (_) {} }
+        async function loadStats(){ try { const r = await fetch('/api/stats/summary'); if (!r.ok) return; const d = await r.json(); const t = d.totals || {}; document.getElementById('statsLine').textContent = `已有 ${t.page_view||0} 次访问 · ${t.generate||0} 次生成 · ${t.share||0} 次分享 · ${t.download||0} 次下载 · ${d.comments||0} 条留言 · ${d.likes||0} 个赞 · ${d.users||0} 位注册用户`; } catch (_) {} }
         loadStats();
         document.getElementById('btnDownloadSingle').addEventListener('click', () => recordStat('download'));
         document.getElementById('btnShare').addEventListener('click', async () => {
@@ -1951,6 +1965,17 @@
             loadComments(); loadStats();
           } catch (e) { statusEl.textContent = '❌ ' + e.message; }
         });
+        // --- 点赞 + 邮箱注册 ---
+        function paintLike(count, liked){ const b = document.getElementById('btnLike'); b.innerHTML = (liked ? '❤️ 已点赞 ' : '🤍 点赞 ') + '<span id="likeCount">' + count + '</span>'; }
+        async function loadLikes(){ try { const r = await fetch('/api/likes'); if (!r.ok) return; const d = await r.json(); paintLike(d.count || 0, !!d.liked); } catch (_) {} }
+        loadLikes();
+        document.getElementById('btnLike').addEventListener('click', async () => { try { const r = await fetch('/api/likes', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({target:'site'})}); if (!r.ok) return; const d = await r.json(); paintLike(d.count || 0, !!d.liked); loadStats(); } catch (_) {} });
+        async function refreshMe(){ try { const r = await fetch('/api/auth/me'); if (!r.ok) return; const d = await r.json(); const u = d.user; const state = document.getElementById('authState'); if (u) { state.textContent = '已登录：' + (u.name || u.email); document.getElementById('btnLogout').classList.remove('hidden'); document.getElementById('btnRegister').classList.add('hidden'); document.getElementById('btnLogin').classList.add('hidden'); ['authEmail','authPassword','authName'].forEach(id => document.getElementById(id).classList.add('hidden')); if (u.name) { const cn = document.getElementById('commentName'); if (!cn.value) cn.value = u.name; } } } catch (_) {} }
+        refreshMe();
+        async function authSubmit(kind){ const email = document.getElementById('authEmail').value.trim(); const password = document.getElementById('authPassword').value; const name = document.getElementById('authName').value.trim(); const statusEl = document.getElementById('authStatus'); if (!email || password.length < 6) { statusEl.textContent = kind === 'register' ? '填一下邮箱，密码至少 6 位～' : '填一下邮箱和密码～'; return; } statusEl.textContent = kind === 'register' ? '注册中…' : '登录中…'; try { const r = await fetch('/api/auth/' + kind, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({email, password, name})}); const d = await r.json().catch(() => ({})); if (!r.ok) throw new Error(d.detail || '失败了'); statusEl.textContent = kind === 'register' ? '✅ 注册成功，欢迎！' : '✅ 已登录'; refreshMe(); loadStats(); } catch (e) { statusEl.textContent = '❌ ' + e.message; } }
+        document.getElementById('btnRegister').addEventListener('click', () => authSubmit('register'));
+        document.getElementById('btnLogin').addEventListener('click', () => authSubmit('login'));
+        document.getElementById('btnLogout').addEventListener('click', async () => { try { await fetch('/api/auth/logout', {method:'POST'}); } catch (_) {} location.reload(); });
         checkBackendStatus();
         requestAnimationFrame(tick);
       });

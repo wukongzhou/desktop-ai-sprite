@@ -6,6 +6,7 @@ import io
 import json
 import math
 import re
+import secrets
 import hashlib
 import hmac
 import html
@@ -65,9 +66,13 @@ def access_code_required() -> bool:
     return PUBLIC_HOSTED_MODE and bool(os.getenv("APP_ACCESS_CODE", "").strip())
 
 
+# 口令关卡只拦 AI 生成类接口；点赞/注册/评论/统计是公开社区功能，不拦。
+_GATE_EXEMPT_PREFIXES = ("/api/access/verify", "/api/auth/", "/api/likes", "/api/comments", "/api/stats/")
+
+
 @app.middleware("http")
 async def public_access_gate(request: Request, call_next):
-    if access_code_required() and request.url.path.startswith("/api/") and request.url.path != "/api/access/verify":
+    if access_code_required() and request.url.path.startswith("/api/") and not request.url.path.startswith(_GATE_EXEMPT_PREFIXES):
         expected = os.getenv("APP_ACCESS_CODE", "").strip()
         supplied = request.cookies.get("pet_access_code", "")
         if not hmac.compare_digest(supplied, expected):
@@ -96,7 +101,7 @@ async def verify_public_access(request: Request):
 STATS_DIR = ROOT / "data"
 STATS_DB = STATS_DIR / "stats.db"
 EVENT_KINDS = {"page_view", "generate", "share", "download"}
-STATS_TEMPLATE = Template('<!DOCTYPE html>\n<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">\n<title>桌面精灵 · 数据后台</title>\n<style>body{font-family:system-ui,sans-serif;max-width:720px;margin:0 auto;padding:24px 16px;color:#2b2522;background:#faf6f0}h1{font-size:20px}h2{font-size:16px;margin-top:28px}.cards{display:flex;gap:12px;flex-wrap:wrap}.card{background:#fff;border:1px solid #eadfd2;border-radius:16px;padding:14px 18px;min-width:120px}.card b{font-size:26px;display:block}table{border-collapse:collapse;width:100%;background:#fff}td,th{border:1px solid #eadfd2;padding:6px 8px;font-size:13px;text-align:center}ul{list-style:none;padding:0}li{background:#fff;border:1px solid #eadfd2;border-radius:12px;padding:10px 12px;margin-bottom:8px}li span{color:#8b7d72;font-size:12px}li p{margin:6px 0 0;font-size:14px;white-space:pre-wrap;word-break:break-word}a{color:#d8653c}</style></head>\n<body><h1>📊 桌面精灵 · 数据后台</h1><p><a href="/">← 回精灵工坊</a></p>\n<div class="cards"><div class="card">访问量<b>$views</b></div><div class="card">生成次数<b>$generates</b></div><div class="card">分享次数<b>$shares</b></div><div class="card">下载次数<b>$downloads</b></div><div class="card">留言条数<b>$comments_n</b></div></div>\n<h2>最近 7 天（UTC）</h2><table><tr><th>日期</th><th>访问</th><th>生成</th><th>分享</th><th>下载</th></tr>$rows</table>\n<h2>留言（最新 $n 条）</h2><ul>$body</ul></body></html>')
+STATS_TEMPLATE = Template('<!DOCTYPE html>\n<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">\n<title>桌面精灵 · 数据后台</title>\n<style>body{font-family:system-ui,sans-serif;max-width:720px;margin:0 auto;padding:24px 16px;color:#2b2522;background:#faf6f0}h1{font-size:20px}h2{font-size:16px;margin-top:28px}.cards{display:flex;gap:12px;flex-wrap:wrap}.card{background:#fff;border:1px solid #eadfd2;border-radius:16px;padding:14px 18px;min-width:120px}.card b{font-size:26px;display:block}table{border-collapse:collapse;width:100%;background:#fff}td,th{border:1px solid #eadfd2;padding:6px 8px;font-size:13px;text-align:center}ul{list-style:none;padding:0}li{background:#fff;border:1px solid #eadfd2;border-radius:12px;padding:10px 12px;margin-bottom:8px}li span{color:#8b7d72;font-size:12px}li p{margin:6px 0 0;font-size:14px;white-space:pre-wrap;word-break:break-word}a{color:#d8653c}</style></head>\n<body><h1>📊 桌面精灵 · 数据后台</h1><p><a href="/">← 回精灵工坊</a></p>\n<div class="cards"><div class="card">访问量<b>$views</b></div><div class="card">生成次数<b>$generates</b></div><div class="card">分享次数<b>$shares</b></div><div class="card">下载次数<b>$downloads</b></div><div class="card">留言条数<b>$comments_n</b></div><div class="card">点赞<b>$likes</b></div><div class="card">注册用户<b>$users</b></div></div>\n<h2>最近 7 天（UTC）</h2><table><tr><th>日期</th><th>访问</th><th>生成</th><th>分享</th><th>下载</th></tr>$rows</table>\n<h2>留言（最新 $n 条）</h2><ul>$body</ul></body></html>')
 
 
 def _stats_conn():
@@ -111,6 +116,21 @@ def _stats_conn():
         " name TEXT NOT NULL DEFAULT '', text TEXT NOT NULL, ts INTEGER NOT NULL,"
         " ip TEXT NOT NULL DEFAULT '')"
     )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS likes (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " target TEXT NOT NULL DEFAULT 'site', ts INTEGER NOT NULL,"
+        " ip TEXT NOT NULL DEFAULT '', sid TEXT NOT NULL DEFAULT '')"
+    )
+    conn.execute(
+        "CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT,"
+        " email TEXT NOT NULL, name TEXT NOT NULL DEFAULT '', salt TEXT NOT NULL,"
+        " pw_hash TEXT NOT NULL, created INTEGER NOT NULL, last_login INTEGER NOT NULL DEFAULT 0)"
+    )
+    try:
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_likes_target_sid ON likes (target, sid)")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email ON users (email)")
+    except Exception:
+        pass
     conn.commit()
     return conn
 
@@ -120,6 +140,56 @@ def _client_ip(request: Request) -> str:
     if forwarded:
         return forwarded.split(",")[0].strip()[:64]
     return (request.client.host if request.client else "")[:64]
+
+# ---------------------------------------------------------------------------
+# 邮箱注册 + 会话（密码只存加盐哈希；会话是 HMAC 签名 cookie，密钥优先用
+# SESSION_SECRET 环境变量，没配就用一次启动随机值——重启后登录失效，
+# 和本服务免费版重启清空数据的现状一致）
+# ---------------------------------------------------------------------------
+_SESSION_KEY: Optional[str] = None
+
+
+def _session_key() -> bytes:
+    global _SESSION_KEY
+    if _SESSION_KEY is None:
+        env_key = os.getenv("SESSION_SECRET", "").strip()
+        _SESSION_KEY = env_key if env_key else secrets.token_hex(32)
+    return _SESSION_KEY.encode()
+
+
+def _hash_password(password: str, salt_hex: str = "") -> tuple[str, str]:
+    salt = bytes.fromhex(salt_hex) if salt_hex else os.urandom(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 200_000)
+    return salt.hex(), digest.hex()
+
+
+def _make_session(user_id: int) -> str:
+    exp = int(time.time()) + 30 * 86400
+    payload = f"{user_id}.{exp}"
+    sig = hmac.new(_session_key(), payload.encode(), hashlib.sha256).hexdigest()
+    return f"{payload}.{sig}"
+
+
+def _read_session(request: Request) -> Optional[int]:
+    token = request.cookies.get("pet_session", "")
+    try:
+        uid, exp, sig = token.split(".")
+        if int(exp) < int(time.time()):
+            return None
+        expect = hmac.new(_session_key(), f"{uid}.{exp}".encode(), hashlib.sha256).hexdigest()
+        if hmac.compare_digest(sig, expect):
+            return int(uid)
+    except Exception:
+        return None
+    return None
+
+
+def _get_sid(request: Request) -> str:
+    """点赞用的匿名浏览器标识（pet_sid cookie），不是登录态。"""
+    sid = request.cookies.get("pet_sid", "")
+    if not re.fullmatch(r"[0-9a-f]{32}", sid or ""):
+        sid = secrets.token_hex(16)
+    return sid
 
 
 def record_event(kind: str, ip: str = "") -> None:
@@ -139,6 +209,8 @@ def _summary_data() -> dict:
     totals = {kind: 0 for kind in ("page_view", "generate", "share", "download")}
     daily = []
     comments = 0
+    likes = 0
+    users = 0
     try:
         conn = _stats_conn()
         for kind, count in conn.execute("SELECT kind, COUNT(*) FROM events GROUP BY kind"):
@@ -155,10 +227,12 @@ def _summary_data() -> dict:
             daily.append({"date": day.isoformat(), **{k: 0 for k in totals},
                           **{k: int(v) for k, v in row.items() if k in totals}})
         comments = int(conn.execute("SELECT COUNT(*) FROM comments").fetchone()[0])
+        likes = int(conn.execute("SELECT COUNT(*) FROM likes").fetchone()[0])
+        users = int(conn.execute("SELECT COUNT(*) FROM users").fetchone()[0])
         conn.close()
     except Exception:
         pass
-    return {"totals": totals, "daily": daily, "comments": comments}
+    return {"totals": totals, "daily": daily, "comments": comments, "likes": likes, "users": users}
 
 
 app.add_middleware(
@@ -897,6 +971,159 @@ def post_comment(request: Request, body: CommentIn):
     return {"ok": True}
 
 
+
+# ---------------------------------------------------------------------------
+# 邮箱注册 / 登录 / 点赞
+# ---------------------------------------------------------------------------
+class RegisterIn(BaseModel):
+    email: str = Field(default="", max_length=120)
+    password: str = Field(default="", max_length=128)
+    name: str = Field(default="", max_length=20)
+
+
+@app.post("/api/auth/register")
+def auth_register(request: Request, body: RegisterIn):
+    email = body.email.strip().lower()
+    password = body.password
+    name = body.name.strip()
+    if not re.fullmatch(r"[^@\s]+@[^@\s]+\.[^@\s]+", email):
+        raise HTTPException(400, "邮箱格式不对。")
+    if len(password) < 6:
+        raise HTTPException(400, "密码至少 6 位。")
+    salt, pw_hash = _hash_password(password)
+    now = int(time.time())
+    try:
+        conn = _stats_conn()
+        conn.execute(
+            "INSERT INTO users (email, name, salt, pw_hash, created, last_login) VALUES (?, ?, ?, ?, ?, ?)",
+            (email, name, salt, pw_hash, now, now),
+        )
+        uid = conn.execute("SELECT last_insert_rowid()").fetchone()[0]
+        conn.commit()
+        conn.close()
+    except sqlite3.IntegrityError:
+        raise HTTPException(409, "这个邮箱已经注册过，直接登录就行。")
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(500, "注册失败，稍后再试。")
+    response = JSONResponse({"ok": True, "email": email, "name": name})
+    response.set_cookie("pet_session", _make_session(uid), httponly=True,
+                        secure=request.url.scheme == "https", samesite="lax", max_age=30 * 86400)
+    return response
+
+
+class LoginIn(BaseModel):
+    email: str = Field(default="", max_length=120)
+    password: str = Field(default="", max_length=128)
+
+
+@app.post("/api/auth/login")
+def auth_login(request: Request, body: LoginIn):
+    email = body.email.strip().lower()
+    try:
+        conn = _stats_conn()
+        row = conn.execute(
+            "SELECT id, name, salt, pw_hash FROM users WHERE email = ?", (email,)
+        ).fetchone()
+        if not row:
+            conn.close()
+            raise HTTPException(401, "邮箱或密码不对。")
+        uid, name, salt, pw_hash = row
+        _, calc = _hash_password(body.password, salt)
+        if not hmac.compare_digest(calc, pw_hash):
+            conn.close()
+            raise HTTPException(401, "邮箱或密码不对。")
+        conn.execute("UPDATE users SET last_login = ? WHERE id = ?", (int(time.time()), uid))
+        conn.commit()
+        conn.close()
+    except HTTPException:
+        raise
+    except Exception:
+        raise HTTPException(500, "登录失败，稍后再试。")
+    response = JSONResponse({"ok": True, "email": email, "name": name})
+    response.set_cookie("pet_session", _make_session(uid), httponly=True,
+                        secure=request.url.scheme == "https", samesite="lax", max_age=30 * 86400)
+    return response
+
+
+@app.post("/api/auth/logout")
+def auth_logout():
+    response = JSONResponse({"ok": True})
+    response.delete_cookie("pet_session")
+    return response
+
+
+@app.get("/api/auth/me")
+def auth_me(request: Request):
+    uid = _read_session(request)
+    if not uid:
+        return {"user": None}
+    try:
+        conn = _stats_conn()
+        row = conn.execute("SELECT email, name FROM users WHERE id = ?", (uid,)).fetchone()
+        conn.close()
+    except Exception:
+        row = None
+    if not row:
+        return {"user": None}
+    return {"user": {"email": row[0], "name": row[1]}}
+
+
+class LikeIn(BaseModel):
+    target: str = Field(default="site", max_length=32)
+
+
+@app.get("/api/likes")
+def get_likes(request: Request, target: str = "site"):
+    sid = _get_sid(request)
+    try:
+        conn = _stats_conn()
+        count = int(conn.execute("SELECT COUNT(*) FROM likes WHERE target = ?", (target,)).fetchone()[0])
+        liked = conn.execute(
+            "SELECT 1 FROM likes WHERE target = ? AND sid = ?", (target, sid)
+        ).fetchone() is not None
+        conn.close()
+    except Exception:
+        count, liked = 0, False
+    response = JSONResponse({"count": count, "liked": liked})
+    if not request.cookies.get("pet_sid"):
+        response.set_cookie("pet_sid", sid, httponly=True, samesite="lax", max_age=365 * 86400)
+    return response
+
+
+@app.post("/api/likes")
+def toggle_like(request: Request, body: LikeIn):
+    target = (body.target or "site").strip()[:32] or "site"
+    sid = _get_sid(request)
+    try:
+        conn = _stats_conn()
+        row = conn.execute(
+            "SELECT id FROM likes WHERE target = ? AND sid = ?", (target, sid)
+        ).fetchone()
+        if row:
+            conn.execute("DELETE FROM likes WHERE id = ?", (row[0],))
+            liked = False
+        else:
+            try:
+                conn.execute(
+                    "INSERT INTO likes (target, ts, ip, sid) VALUES (?, ?, ?, ?)",
+                    (target, int(time.time()), _client_ip(request), sid),
+                )
+            except sqlite3.IntegrityError:
+                pass
+            liked = True
+        count = int(conn.execute("SELECT COUNT(*) FROM likes WHERE target = ?", (target,)).fetchone()[0])
+        conn.commit()
+        conn.close()
+    except Exception:
+        raise HTTPException(500, "点赞失败，稍后再试。")
+    response = JSONResponse({"count": count, "liked": liked})
+    if not request.cookies.get("pet_sid"):
+        response.set_cookie("pet_sid", sid, httponly=True, samesite="lax", max_age=365 * 86400)
+    return response
+
+
 @app.get("/stats", include_in_schema=False)
 def stats_page():
     data = _summary_data()
@@ -924,7 +1151,8 @@ def stats_page():
     page = STATS_TEMPLATE.safe_substitute(
         views=totals["page_view"], generates=totals["generate"],
         shares=totals["share"], downloads=totals["download"],
-        comments_n=data["comments"], rows=rows, body=body, n=len(comments),
+        comments_n=data["comments"], likes=data["likes"], users=data["users"],
+        rows=rows, body=body, n=len(comments),
     )
     return Response(page, media_type="text/html; charset=utf-8")
 
