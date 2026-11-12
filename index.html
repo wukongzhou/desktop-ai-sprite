@@ -10,6 +10,10 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Noto+Sans+SC:wght@400;500;700;900&display=swap" rel="stylesheet">
   <style>
     * { box-sizing: border-box; }
+    /* v2 layout fix: grid/flex items must be allowed to shrink below their min-content size,
+       otherwise the 320px canvas forces the Step 1 grid wider than its card (grid blowout). */
+    div[class*="col-span-"], section[class*="col-span-"] { min-width: 0; }
+    #anchorStage canvas { max-width: 100%; }
     body {
       margin: 0;
       background: #f5efe6;
@@ -89,7 +93,7 @@
 
       <div class="flex items-center gap-2 flex-wrap">
         <label class="inline-flex items-center gap-2 text-xs font-semibold text-[#544840]" for="languageSelect"><span>🌐</span><select id="languageSelect" class="rounded-lg border border-[#d9cbbb] bg-white px-2 py-1.5" aria-label="Interface language"></select></label>
-        <div id="backendBadge" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-[#ece2d6] text-[#5c5048]">
+        <div id="backendBadge" title="查看引擎状态" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-[#ece2d6] text-[#5c5048] cursor-pointer">
           <span id="backendDot" class="w-2 h-2 rounded-full bg-amber-500"></span>
           <span id="backendText">引擎：实时抽象特征内核（双击 start-windows.bat 可连本机服务）</span>
         </div>
@@ -109,13 +113,13 @@
   </div>
 
   <!-- Main Workspace -->
-  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+  <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-5 grid min-w-0 grid-cols-1 lg:grid-cols-12 gap-6 items-start">
 
     <!-- Left Column: Upload, Focal Anchors & Feature Magnification Controls (5 cols) -->
-    <section class="lg:col-span-5 flex flex-col gap-5">
+    <section class="min-w-0 lg:col-span-5 flex flex-col gap-5">
 
       <!-- Card 1: Image Source & Interactive Feature Anchors -->
-      <div class="bg-white rounded-3xl p-5 shadow-sm border border-[#eadfd2]">
+      <div class="min-w-0 bg-white rounded-3xl p-5 shadow-sm border border-[#eadfd2]">
         <div class="flex items-center justify-between mb-3">
           <h2 class="font-extrabold text-base flex items-center gap-2">
             <span class="w-6 h-6 rounded-lg bg-[#fff0e8] text-[#d8653c] inline-flex items-center justify-center text-xs font-black">1</span>
@@ -127,7 +131,7 @@
         </div>
 
         <!-- Preset Avatars Bar -->
-        <div class="flex items-center gap-2 mb-3 overflow-x-auto pb-1">
+        <div class="flex min-w-0 flex-wrap items-center gap-2 mb-3 pb-1">
           <span class="text-xs font-semibold text-[#7c7067] shrink-0">示例一键试玩：</span>
 <button type="button" data-preset="cat" class="preset-btn shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-[#f7f2ec] border border-transparent hover:border-[#d5c6b6] text-[#4c423b] transition">
             <span>🐱</span><span>领结傲娇喵</span>
@@ -138,21 +142,21 @@
                   <button type="button" data-preset="comic" class="preset-btn shrink-0 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-semibold bg-[#f7f2ec] border border-transparent hover:border-[#d5c6b6] text-[#4c423b] transition"><span>🎨</span><span>水彩漫画</span></button>
 
         <!-- Source Preview + Draggable Focal Points + Upload Dropzone -->
-        <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 items-center">
-          <div class="sm:col-span-6 relative rounded-2xl overflow-hidden bg-[#f3ede4] border border-[#e3d6c7] aspect-square select-none" id="anchorStage">
-            <canvas id="sourceCanvas" width="320" height="320" class="w-full h-full object-cover block"></canvas>
+        <div class="grid min-w-0 grid-cols-1 sm:grid-cols-12 gap-3 items-center">
+          <div class="min-w-0 sm:col-span-6 relative rounded-2xl overflow-hidden bg-[#f3ede4] border border-[#e3d6c7] aspect-square select-none" id="anchorStage">
+            <canvas id="sourceCanvas" width="320" height="320" class="min-w-0 w-full h-full object-cover block"></canvas>
             <!-- Draggable Focal Anchors -->
             <div id="anchorLeftEye" class="anchor-dot bg-[#e0533c]" style="left: 37%; top: 41%;" title="左眼/左镜框放大中心（可拖动）">L</div>
             <div id="anchorRightEye" class="anchor-dot bg-[#e0533c]" style="left: 63%; top: 41%;" title="右眼/右镜框放大中心（可拖动）">R</div>
             <div id="anchorMouth" class="anchor-dot bg-[#2f7d6d]" style="left: 50%; top: 61%;" title="嘴巴/表情张力中心（可拖动）">M</div>
             <div id="anchorAccessory" class="anchor-dot bg-[#d98a2b]" style="left: 50%; top: 24%;" title="头顶/发饰/耳朵特点放大中心（可拖动）">★</div>
-            <div class="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 backdrop-blur-sm text-white text-[11px] px-2 py-1 rounded-lg flex items-center justify-between pointer-events-none">
-              <span>拖动圆点可指定要放大的特点部位</span>
-              <span id="toggleAnchorsHint" class="opacity-80">L/R眼 · M嘴 · ★配饰</span>
+            <div class="absolute bottom-1.5 left-1.5 right-1.5 bg-black/60 backdrop-blur-sm text-white text-[11px] px-2 py-1 rounded-lg flex flex-wrap items-center justify-between gap-1 pointer-events-none">
+              <span class="min-w-0 break-words">拖动圆点可指定要放大的特点部位</span>
+              <span id="toggleAnchorsHint" class="shrink-0 opacity-80">L/R眼 · M嘴 · ★配饰</span>
             </div>
           </div>
 
-          <div class="sm:col-span-6 flex flex-col gap-2.5">
+          <div class="min-w-0 sm:col-span-6 flex flex-col gap-2.5">
             <label for="fileInput" id="dropZone" class="cursor-pointer border-2 border-dashed border-[#d5c5b4] hover:border-[#d8653c] bg-[#faf6f0] rounded-2xl p-4 text-center transition flex flex-col items-center justify-center min-h-[132px]">
               <span class="text-2xl mb-1">📤</span>
               <span class="text-xs font-bold text-[#3a312c]">点击上传你的照片 / 拖拽图片</span>
@@ -161,7 +165,7 @@
             </label>
 
             <div class="bg-[#faf6f0] rounded-2xl p-3 border border-[#ede3d7]">
-              <div class="flex items-center justify-between text-xs font-bold text-[#4a3f39] mb-1">
+              <div class="flex min-w-0 flex-wrap items-center justify-between gap-1 text-xs font-bold text-[#4a3f39] mb-1">
                 <span>🔍 识别到的显著视觉特点</span>
                 <label class="inline-flex items-center gap-1 cursor-pointer font-medium text-[11px] text-[#786c63]">
                   <input id="chkShowAnchors" type="checkbox" checked class="rounded text-[#d8653c]">
@@ -576,6 +580,15 @@
       </div>
       <p id="apiSettingsStatus" class="mt-3 min-h-5 text-xs text-[#8b4a32]"></p>
       <div class="mt-2 flex flex-wrap justify-end gap-2"><button id="btnApiTest" class="rounded-xl border px-3.5 py-2 text-xs font-bold">保存并测试接口</button><button id="btnApiSave" class="rounded-xl bg-[#d8653c] px-3.5 py-2 text-xs font-bold text-white">保存接口</button></div>
+    </section>
+  </div>
+  <div id="accessModal" class="fixed inset-0 z-[70] hidden items-center justify-center bg-black/50 p-4">
+    <section class="w-full max-w-sm rounded-3xl bg-white p-5 shadow-2xl">
+      <div class="flex items-center justify-between"><h2 class="text-lg font-black">🔑 测试版访问口令</h2><button id="btnAccessClose" class="rounded-lg px-3 py-1 text-xl" aria-label="Close">×</button></div>
+      <p class="mt-2 text-xs leading-relaxed text-[#6d5d53]">这个公网测试版需要访问口令才能调用 AI 接口。输入一次后浏览器会记住 14 天。</p>
+      <label class="mt-4 block text-xs font-bold">访问口令<input id="accessCodeInput" type="password" autocomplete="off" class="mt-1 w-full rounded-xl border p-2.5 font-normal" placeholder="输入访问口令"></label>
+      <p id="accessStatus" class="mt-3 min-h-5 text-xs text-[#8b4a32]"></p>
+      <div class="mt-2 flex flex-wrap justify-end gap-2"><button id="btnAccessCancel" class="rounded-xl border px-3.5 py-2 text-xs font-bold">稍后再说</button><button id="btnAccessSubmit" class="rounded-xl bg-[#d8653c] px-3.5 py-2 text-xs font-bold text-white">进入</button></div>
     </section>
   </div>
   <script>
@@ -1636,7 +1649,16 @@
       async function checkBackendStatus() {
         try {
           const res = await fetch('/api/status');
-          if (!res.ok) return;
+          if (res.status === 401) {
+            document.getElementById('backendDot').className = 'w-2 h-2 rounded-full bg-amber-500';
+            document.getElementById('backendText').textContent = (langSel.value==='zh' ? '需要访问口令 · 点击此处输入' : 'Access code required · click here to enter');
+            return;
+          }
+          if (!res.ok) {
+            document.getElementById('backendDot').className = 'w-2 h-2 rounded-full bg-rose-500';
+            document.getElementById('backendText').textContent = (langSel.value==='zh' ? `服务连接失败（HTTP ${res.status}），请稍后重试` : `Service connection failed (HTTP ${res.status})`);
+            return;
+          }
           const data = await res.json();
           state.backendReady = Boolean(data.ready);
           state.backendEngine = data.engine || 'procedural-abstract-v2';
@@ -1871,16 +1893,36 @@
     })();
   </script>
 <script>
-    (async function publicAccessPrompt(){
-      try {
-        const status = await fetch('/api/status');
-        if (status.status !== 401) return;
-        const code = prompt('桌面 AI 精灵测试版需要访问口令：');
-        if (!code) return;
-        const verified = await fetch('/api/access/verify', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({code})});
-        if (verified.ok) location.reload();
-        else alert('访问口令不正确，请联系测试版提供者。');
-      } catch (_) {}
+    (function publicAccessGate(){
+      const modal = document.getElementById('accessModal');
+      const input = document.getElementById('accessCodeInput');
+      const statusEl = document.getElementById('accessStatus');
+      function open(){ modal.classList.remove('hidden'); modal.classList.add('flex'); statusEl.textContent=''; input.value=''; setTimeout(()=>input.focus(), 50); }
+      function close(){ modal.classList.add('hidden'); modal.classList.remove('flex'); }
+      window.__openAccessModal = open;
+      document.getElementById('btnAccessClose').addEventListener('click', close);
+      document.getElementById('btnAccessCancel').addEventListener('click', close);
+      modal.addEventListener('click', (e)=>{ if (e.target === modal) close(); });
+      document.getElementById('backendBadge').addEventListener('click', ()=>{ if (!window.__backendAuthed) open(); });
+      async function submit(){
+        const code = input.value.trim();
+        if (!code) { statusEl.textContent = '请先输入访问口令。'; return; }
+        statusEl.textContent = '正在验证…';
+        try {
+          const verified = await fetch('/api/access/verify', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({code})});
+          if (verified.ok) location.reload();
+          else statusEl.textContent = '访问口令不正确，请重试。';
+        } catch (_) { statusEl.textContent = '验证失败，请检查网络后重试。'; }
+      }
+      document.getElementById('btnAccessSubmit').addEventListener('click', submit);
+      input.addEventListener('keydown', (e)=>{ if (e.key === 'Enter') submit(); });
+      (async function(){
+        try {
+          const res = await fetch('/api/status');
+          if (res.status === 401) open();
+          else window.__backendAuthed = res.ok;
+        } catch (_) {}
+      })();
     })();
   </script>
 </body>
