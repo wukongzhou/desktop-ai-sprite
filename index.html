@@ -252,7 +252,7 @@
             <div class="text-[11px] text-[#7d7067] leading-tight mt-0.5">16-Bit 像素颗粒 + 街机精灵质感</div>
           </button>
         </div>
-        <p class="mt-2 text-[11px] text-[#7d7067]">点击任一流派会立即调用图片 AI 按所选风格重新生成，并消耗该模型的额度。</p>
+        <p class="mt-2 text-[11px] text-[#7d7067]">先选一个流派，再点下面的「生成 3D 萌宠」开始生成；每次生成会消耗图片 AI 的额度。</p>
       </div>
 
       <!-- AI generation controls card -->
@@ -1236,7 +1236,7 @@
         '橙镜极客':'Orange-glasses geek','领结傲娇喵':'Bow-tie cat','贝雷帽卷发':'Beret artist','拖动圆点可指定要放大的特点部位':'Drag the markers to highlight facial features',
         'L/R眼 · M嘴 · ★配饰':'L/R eyes · M mouth · ★ accessory','点击上传你的照片 / 拖拽图片':'Click to upload or drag an image here',
         '支持人像、萌宠、二次元或任意物体':'Supports people, pets, anime, or other images','🔍 识别到的显著视觉特点':'🔍 Detected visual traits','显示锚点':'Show markers',
-        '抽象精灵风格流派':'2. Choose a character style','点击任一流派会立即调用图片 AI 按所选风格重新生成，并消耗该模型的额度。':'Click a style to regenerate the pet with the image model; this uses its quota.','🎲 随机灵魂暴走':'🎲 Random style',
+        '抽象精灵风格流派':'2. Choose a character style','先选一个流派，再点下面的「生成 3D 萌宠」开始生成；每次生成会消耗图片 AI 的额度。':'Pick a style first, then click "Generate 3D pet" below to start; each generation uses the image model quota.','🎲 随机灵魂暴走':'🎲 Random style',
         '夸张大头萌系':'Exaggerated chibi','Q版大头 + 闪亮大眼 + 饱满色块':'Big head, sparkling eyes, bold colors',
         '怪诞超现实':'Surreal oddball','大小眼不对称 + 戏剧感扭曲神态':'Quirky asymmetry and dramatic expression',
         '几何立体抽象':'Geometric abstract','毕加索式切面 + 撞色几何拼贴':'Cubist facets and bold geometric colors',
@@ -1509,8 +1509,7 @@
           state.style = card.dataset.style;
           document.querySelectorAll('.style-card').forEach((c) => c.classList.toggle('active', c === card));
           const styleNames=langSel.value==='zh'?{big:'夸张大头萌系',weird:'怪诞超现实',geo:'几何立体抽象',grumpy:'俏皮讽刺漫画像',pop:'潮流波普贴纸',pixel:'复古像素桌宠'}:{big:'Exaggerated chibi',weird:'Surreal oddball',geo:'Geometric abstract',grumpy:'Satirical comic',pop:'Pop-art sticker',pixel:'Retro pixel pet'};
-          document.getElementById('chibiMsg').textContent=langSel.value==='zh'?`已选择「${styleNames[state.style]}」，正在按此风格重新生成 3D 萌宠…`:`Selected ${styleNames[state.style]}; regenerating the 3D pet in this style…`;
-          runChibi3d();
+          document.getElementById('chibiMsg').textContent=langSel.value==='zh'?`已选择「${styleNames[state.style]}」，点下面的「生成 3D 萌宠」开始生成。`:`Selected ${styleNames[state.style]}; click "Generate 3D pet" below to start.`;
         });
       });
 
