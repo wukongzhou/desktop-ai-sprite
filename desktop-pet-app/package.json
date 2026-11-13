@@ -1,0 +1,12 @@
+{
+  "name": "desktop-pet-app",
+  "version": "0.1.0",
+  "description": "会在桌面上随机走动、有独立性格、会吃掉被删除文件的桌面精灵",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "devDependencies": {
+    "electron": "^33.2.0"
+  }
+}
