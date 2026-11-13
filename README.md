@@ -2,6 +2,10 @@
 
 桌面 AI 精灵是一款 AI 卡通形象创作工具。上传人物、宠物或其他图片后，视觉模型会分析画面中的外观特点，再生成一个全新设计的大头小身子卡通精灵。它以图中人物的发型、配饰、颜色与神态作为创作线索，不是把照片抠出来，也不是直接给照片套滤镜。
 
+## 宣传视频
+
+<video src="https://raw.githubusercontent.com/wukongzhou/desktop-ai-sprite/desktop-pet-app/assets/桌面精灵-推广视频-9比16-v3-720p.mp4" controls width="360"></video>
+
 ## 创作风格
 
 - **夸张大头萌系**：放大头部比例，突出眼睛和表情。
