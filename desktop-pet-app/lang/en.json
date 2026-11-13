@@ -1,0 +1,15 @@
+{
+  "language": "en",
+  "name": "English",
+  "intents": {
+    "come": ["come here", "come to me", "come over", "get over here", "follow me", "over here"],
+    "stay": ["stay", "stop", "stay there", "don't move", "stay put", "freeze", "hold still"],
+    "roam": ["go play", "go explore", "wander around", "go wander", "play by yourself", "roam free", "do whatever you want"],
+    "sleep": ["go to sleep", "sleep", "time for bed", "take a nap", "nap time", "good night"],
+    "wake": ["wake up", "get up", "rise and shine", "stop sleeping", "time to get up"],
+    "dance": ["dance", "do a dance", "show me a dance", "do a trick", "perform", "show off"],
+    "praise": ["good boy", "good job", "well done", "you are awesome", "good girl", "great job", "so cute", "thank you"],
+    "scold": ["bad boy", "bad pet", "cut it out", "you are silly", "naughty", "behave", "you annoy me", "no"],
+    "mail": ["check my email", "check email", "any new mail", "read my mail", "check my mail", "any new emails"]
+  }
+}
