@@ -1,12 +1,22 @@
 {
   "name": "desktop-pet-app",
-  "version": "0.1.0",
-  "description": "会在桌面上随机走动、有独立性格、会吃掉被删除文件的桌面精灵",
+  "version": "0.2.0",
+  "description": "会在桌面上随机走动、有独立性格、会学习、听得懂中英文指令的桌面精灵",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "dist": "electron-builder"
   },
   "devDependencies": {
-    "electron": "^33.2.0"
+    "electron": "^33.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.wukongzhou.desktoppet",
+    "productName": "DesktopPet",
+    "files": ["**/*", "!README.md", "!dist/**"],
+    "win": { "target": "nsis" },
+    "mac": { "target": "dmg" },
+    "linux": { "target": "AppImage" }
   }
 }
