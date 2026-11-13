@@ -1,11 +1,15 @@
-const { app, BrowserWindow, screen, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, screen, ipcMain, Menu, session } = require('electron');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const { Brain } = require('./brain');
 const { Understander } = require('./understand');
+const guard = require('./guard'); // 安全限制，规则写在 guard.js 开头
 
-const cfg = JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'));
+const cfg = Object.assign(
+  { allowNetwork: false, apiUrl: '', watchDirs: [] },
+  JSON.parse(fs.readFileSync(path.join(__dirname, 'config.json'), 'utf8'))
+);
 
 const SIZE = 150;
 const rand = (a, b) => a + Math.random() * (b - a);
@@ -25,6 +29,10 @@ let bubble = '';
 let lastSent = '';
 let typing = false; // 主人正在输入指令时，精灵乖乖等着
 let pokes = [];
+const commandOk = guard.makeLimiter(5, 5000); // 5 秒内最多 5 条指令
+
+// 只接受来自精灵自己窗口的消息
+const fromPet = (e) => win && !win.isDestroyed() && e.sender === win.webContents;
 
 // ---------- 性格：第一次启动随机生成，之后保持不变 ----------
 function loadPersonality() {
@@ -113,10 +121,10 @@ function tick() {
   }
 }
 
-// ---------- AI：可选。配置了 apiUrl 才会调用 ----------
-// 约定：POST { personality, event }，返回 { emoji } 或 { intent }
+// ---------- AI：可选，默认关闭。要在 config.json 里把 allowNetwork 设为 true 并填好 apiUrl ----------
+// 约定：POST { personality, event }，返回 { emoji } 或 { intent }（返回内容会被检查，只收白名单内的）
 async function askAI(event) {
-  if (!cfg.apiUrl) return null;
+  if (!cfg.allowNetwork || !cfg.apiUrl || !guard.validApiUrl(cfg.apiUrl)) return null;
   try {
     const res = await fetch(cfg.apiUrl, {
       method: 'POST',
@@ -130,8 +138,8 @@ async function askAI(event) {
   }
 }
 
-// ---------- 本领：每个意图对应一个动作。以后加新本领（比如真的去查邮件），往这里加一项，
-// 再在 lang/ 语言包里加上对应的说法就行 ----------
+// ---------- 本领白名单：精灵能做的事只有这些，而且都只是动作和表情。
+// 以后加新本领往这里加一项，再在语言包里加说法。语言包自己不能创造新本领。----------
 const skills = {
   come() {
     const c = screen.getCursorScreenPoint();
@@ -168,9 +176,14 @@ const skills = {
     setState('sulk', 3000, '🤷');
   },
 };
+const ALLOWED_INTENTS = [...Object.keys(skills), 'praise', 'scold'];
 const NO_REFUSE = new Set(['praise', 'scold', 'mail']);
 
 function runIntent(intent) {
+  if (!guard.allowedIntent(intent, ALLOWED_INTENTS)) {
+    setState('idle', 2000, '❓'); // 不在白名单里的，一律当没听懂
+    return;
+  }
   if (intent === 'praise') {
     brain.reward(1, state);
     target = null;
@@ -182,10 +195,6 @@ function runIntent(intent) {
     target = null;
     if (personality.temper > 0.6) setState('grumpy', 2500, '💢');
     else setState('sulk', 3000, '😢');
-    return;
-  }
-  if (!skills[intent]) {
-    setState('idle', 2000, '❓'); // 没听懂
     return;
   }
   // 有脾气：心情差、脾气大的时候，会不听话
@@ -200,13 +209,13 @@ function runIntent(intent) {
 async function handleCommand(text) {
   const { intent } = understander.parse(text);
   if (intent === 'unknown') {
-    const ai = await askAI({ type: 'command', text, intents: [...Object.keys(skills), 'praise', 'scold'] });
-    if (ai && ai.intent && ai.intent !== 'unknown') return runIntent(ai.intent);
+    const ai = await askAI({ type: 'command', text, intents: ALLOWED_INTENTS });
+    if (ai && guard.allowedIntent(ai.intent, ALLOWED_INTENTS)) return runIntent(ai.intent);
   }
   runIntent(intent);
 }
 
-// ---------- 吃文件：监控文件夹，有文件消失就当它被删了 ----------
+// ---------- 吃文件：只读监控，只"看"文件是否消失，从不删除、修改、移动、上传任何文件 ----------
 async function onFileDeleted(name, size) {
   const mb = size / 1048576;
   const gain = (8 + mb * 2) * (0.6 + personality.appetite * 0.8);
@@ -219,7 +228,8 @@ async function onFileDeleted(name, size) {
     sizeMB: Number(mb.toFixed(2)),
     fullness: Math.round(fullness),
   });
-  if (ai && ai.emoji && state === 'eat') bubble = ai.emoji;
+  const emoji = ai && guard.cleanEmoji(ai.emoji);
+  if (emoji && state === 'eat') bubble = emoji;
 }
 
 function watchDir(dir) {
@@ -248,8 +258,9 @@ function watchDir(dir) {
   }
 }
 
-// ---------- 和主人互动 ----------
-ipcMain.on('poke', () => {
+// ---------- 和主人互动（只接受精灵自己窗口发来的消息） ----------
+ipcMain.on('poke', (e) => {
+  if (!fromPet(e)) return;
   target = null;
   const now = Date.now();
   pokes = pokes.filter((t) => now - t < 30000);
@@ -264,9 +275,13 @@ ipcMain.on('poke', () => {
   }
 });
 
-ipcMain.on('command', (_e, text) => handleCommand(String(text).slice(0, 200)));
+ipcMain.on('command', (e, text) => {
+  if (!fromPet(e) || typeof text !== 'string' || !commandOk()) return;
+  handleCommand(text.slice(0, 60));
+});
 
-ipcMain.on('typing', (_e, v) => {
+ipcMain.on('typing', (e, v) => {
+  if (!fromPet(e)) return;
   typing = !!v;
   if (typing) {
     target = null;
@@ -276,19 +291,26 @@ ipcMain.on('typing', (_e, v) => {
   }
 });
 
-ipcMain.on('menu', () => {
+ipcMain.on('menu', (e) => {
+  if (!fromPet(e)) return;
   Menu.buildFromTemplate([{ label: personality.name + '：再见', click: () => app.quit() }]).popup({
     window: win,
   });
 });
 
 // ---------- 启动 ----------
-app.whenReady().then(() => {
+function start() {
   const data = app.getPath('userData');
   personality = loadPersonality();
   brain = new Brain(path.join(data, 'brain.json'));
   // 语言包：安装目录自带的 lang/，加上用户数据目录里自己加的 lang/
   understander = new Understander([path.join(__dirname, 'lang'), path.join(data, 'lang')]);
+
+  // 窗口里不许访问任何网络、不给任何设备权限（麦克风、摄像头、定位等）
+  session.defaultSession.webRequest.onBeforeRequest((details, cb) => {
+    cb({ cancel: !details.url.startsWith('file://') });
+  });
+  session.defaultSession.setPermissionRequestHandler((_wc, _perm, cb) => cb(false));
 
   const wa = screen.getPrimaryDisplay().workArea;
   pos = { x: wa.x + wa.width / 2, y: wa.y + wa.height / 2 };
@@ -304,7 +326,12 @@ app.whenReady().then(() => {
     resizable: false,
     skipTaskbar: true,
     hasShadow: false,
-    webPreferences: { preload: path.join(__dirname, 'preload.js') },
+    webPreferences: {
+      preload: path.join(__dirname, 'preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
   });
   win.setAlwaysOnTop(true, 'screen-saver');
   win.setVisibleOnAllWorkspaces(true);
@@ -320,8 +347,24 @@ app.whenReady().then(() => {
   }, 1500);
   setInterval(() => brain.saveNow(), 30000);
 
-  for (const d of cfg.watchDirs) watchDir(d.replace(/^~/, os.homedir()));
+  // 只允许监控个人文件夹里的目录
+  const dirs = Array.isArray(cfg.watchDirs) ? cfg.watchDirs : [];
+  for (const d of dirs) {
+    const dir = path.resolve(String(d).replace(/^~/, os.homedir()));
+    if (guard.insideDir(os.homedir(), dir)) watchDir(dir);
+    else console.log('只允许监控个人文件夹内的目录，已跳过：', dir);
+  }
+}
+
+// 不许打开网页、不许跳转、不许弹新窗口
+app.on('web-contents-created', (_e, wc) => {
+  wc.on('will-navigate', (ev) => ev.preventDefault());
+  wc.setWindowOpenHandler(() => ({ action: 'deny' }));
 });
 
 app.on('before-quit', () => brain && brain.saveNow());
 app.on('window-all-closed', () => app.quit());
+
+// 同一台电脑上只允许运行一只
+if (!app.requestSingleInstanceLock()) app.quit();
+else app.whenReady().then(start);
