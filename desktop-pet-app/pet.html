@@ -1,0 +1,68 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  html, body { margin: 0; background: transparent; overflow: hidden; user-select: none; }
+  #stage { width: 150px; height: 150px; position: relative; }
+  #flip, #fat { position: absolute; inset: 0; transform-origin: 75px 125px; }
+  #pet {
+    position: absolute; left: 35px; top: 55px; width: 80px; height: 70px;
+    border-radius: 50% 50% 45% 45%; background: #ffd98a; border: 3px solid #2b2522;
+    box-sizing: border-box; transform-origin: 50% 100%; cursor: pointer;
+  }
+  .eye { position: absolute; top: 22px; width: 9px; height: 13px; border-radius: 50%; background: #2b2522; }
+  .eye.l { left: 18px; } .eye.r { right: 18px; }
+  #mouth {
+    position: absolute; left: 50%; top: 40px; width: 14px; height: 7px; margin-left: -7px;
+    border-bottom: 3px solid #2b2522; border-radius: 0 0 14px 14px;
+  }
+  #bubble { position: absolute; left: 50%; top: 12px; transform: translateX(-50%); font-size: 26px; }
+
+  @keyframes hop { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-14px); } }
+  @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-4px); } 75% { transform: translateX(4px); } }
+  @keyframes chomp { 0%, 100% { height: 7px; } 50% { height: 16px; } }
+  @keyframes breathe { 0%, 100% { transform: scaleY(1); } 50% { transform: scaleY(1.06); } }
+
+  .walk { animation: hop .55s infinite; }
+  .run { animation: hop .28s infinite; }
+  .sit { transform: scaleY(.86); }
+  .sleep { animation: breathe 2.4s infinite; }
+  .sleep .eye { height: 3px; margin-top: 6px; }
+  .eat { animation: hop .35s infinite; }
+  .eat #mouth { animation: chomp .25s infinite; }
+  .stuffed .eye { height: 4px; width: 12px; margin-top: 5px; }
+  .stuffed #mouth { width: 10px; margin-left: -5px; }
+  .grumpy { background: #ff9b8a !important; animation: shake .15s infinite; }
+  .grumpy #mouth { border-bottom: none; border-top: 3px solid #2b2522; border-radius: 14px 14px 0 0; top: 44px; }
+  .happy { animation: hop .6s infinite; }
+  .happy #mouth { width: 22px; margin-left: -11px; height: 10px; }
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="flip"><div id="fat">
+      <div id="pet" class="idle">
+        <div class="eye l"></div><div class="eye r"></div><div id="mouth"></div>
+      </div>
+    </div></div>
+    <div id="bubble"></div>
+  </div>
+<script>
+  const petEl = document.getElementById('pet');
+  const flip = document.getElementById('flip');
+  const fat = document.getElementById('fat');
+  const bubbleEl = document.getElementById('bubble');
+
+  window.pet.onState(({ state, dir, bubble, fullness }) => {
+    petEl.className = state;
+    flip.style.transform = 'scaleX(' + dir + ')';
+    fat.style.transform = 'scale(' + (1 + fullness / 250) + ')';
+    bubbleEl.textContent = bubble || '';
+  });
+
+  petEl.addEventListener('click', () => window.pet.poke());
+  document.addEventListener('contextmenu', (e) => { e.preventDefault(); window.pet.menu(); });
+</script>
+</body>
+</html>
