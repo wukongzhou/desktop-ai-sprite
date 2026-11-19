@@ -98,7 +98,7 @@
           <span id="backendText">引擎：实时抽象特征内核（双击 start-windows.bat 可连本机服务）</span>
         </div>
         <button id="btnSummonPet" type="button" class="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold bg-[#2b2522] hover:bg-[#413834] text-white transition shadow-sm">
-          <span>🚀 召唤到本机桌面</span>
+          <span>📦 下载桌宠安装包</span>
         </button>
       </div>
     </div>
@@ -1810,7 +1810,7 @@
         const button=document.getElementById('btnPetPack');
         button.disabled=true;msg.textContent=langSel.value==='zh'?'⏳ 正在打包你的桌宠安装包…':'⏳ Packing your desktop pet installer…';
         try{
-          const fd=new FormData();fd.append('sprite_data',baseSpriteCanvas.toDataURL('image/png'));
+          const fd=new FormData();fd.append('sprite_data',baseSpriteCanvas.toDataURL('image/png'));fd.append('pet_name',document.getElementById('petNameInput').value||'');
           if(state.aiMotionFile)fd.append('animation_file',state.aiMotionFile);
           const r=await fetch('/api/pet-pack',{method:'POST',body:fd});
           if(!r.ok){const d=await r.json().catch(()=>({}));throw new Error(d.detail||`打包失败 (HTTP ${r.status})`);}
@@ -1833,35 +1833,49 @@
 
       document.getElementById('btnSummonPet').addEventListener('click', async () => {
         const petName = document.getElementById('petNameInput').value || '抽象小精灵';
-        if (!state.customSpriteUrl) { showToast('请先通过 AI 生成 3D 萌宠，再召唤到桌面。'); return; }
-        const dataUrl = state.customSpriteUrl;
-
+        const msg = document.getElementById('petPackMsg');
+        if (!state.customSpriteUrl) {
+          showToast(langSel.value === 'zh' ? '请先生成一个精灵，再下载桌宠包。' : 'Generate a sprite before downloading the desktop pet package.');
+          return;
+        }
+        const button = document.getElementById('btnSummonPet');
+        button.disabled = true;
         try {
           const fd = new FormData();
-          fd.append('sprite_data', dataUrl);
+          fd.append('sprite_data', state.customSpriteUrl);
           fd.append('pet_name', petName);
-          fd.append('scale', '1.0');
           if (state.aiMotionFile) fd.append('animation_file', state.aiMotionFile);
-          const res = await fetch('/api/launch-pet', { method: 'POST', body: fd });
-          if (res.ok) {
-            const info = await res.json();
-            showToast(`🚀 已在你的 Windows 桌面启动置顶精灵「${info.name}」(PID: ${info.pid})！`);
-            return;
+          const response = await fetch('/api/pet-pack', { method: 'POST', body: fd });
+          if (!response.ok) {
+            const detail = await response.json().catch(() => ({}));
+            throw new Error(detail.detail || `下载桌宠包失败 (HTTP ${response.status})`);
           }
-        } catch (_e) {
-          // Show local guide modal when previewing inside browser sandbox
+          const blob = await response.blob();
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `桌面精灵-${petName}.zip`;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 10000);
+          const safeName = String(petName).replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[ch]));
+          modalBody.innerHTML = langSel.value === 'zh'
+            ? `<p class="font-bold text-[#2b2522]">「${safeName}」桌宠包已下载。</p>
+               <p>浏览器出于安全限制，网页不能直接启动你电脑上的桌宠程序。请按下面步骤运行：</p>
+               <ol class="list-decimal pl-5 space-y-1.5"><li>解压刚下载的 ZIP。</li><li>安装 Python 3.9 或更新版本（安装时勾选“Add Python to PATH”）。</li><li>双击解压文件夹中的「启动精灵.bat」。</li></ol>
+               <p class="text-[#9c4d36] font-medium">角色图片已包含在安装包里。电脑未安装 Python 时，启动器会提示你安装。</p>`
+            : `<p class="font-bold text-[#2b2522]">The desktop pet package for “${safeName}” has been downloaded.</p>
+               <p>For security, a website cannot directly start an app on your PC. To run your pet:</p>
+               <ol class="list-decimal pl-5 space-y-1.5"><li>Extract the ZIP.</li><li>Install Python 3.9 or newer and enable “Add Python to PATH”.</li><li>Double-click “启动精灵.bat” in the extracted folder.</li></ol>
+               <p class="text-[#9c4d36] font-medium">Your generated sprite is included in the package.</p>`;
+          petModal.classList.remove('hidden');
+        } catch (error) {
+          if (msg) msg.textContent = '❌ ' + error.message;
+          else showToast('❌ ' + error.message);
+        } finally {
+          button.disabled = false;
         }
-
-        modalBody.innerHTML = `
-          <p class="font-bold text-[#2b2522]">当前精灵「${petName}」已准备就绪！</p>
-          <p>若要在你的 Windows 电脑桌面召唤真正的<b>无边框全透明置顶桌宠</b>，只需两步：</p>
-          <ol class="list-decimal pl-5 space-y-1.5">
-            <li>将完善后的工程解压到你的目录：<br><code class="bg-[#f5efe6] px-1.5 py-0.5 rounded text-[11px] break-all">本机项目目录</code></li>
-            <li>双击运行 <code class="bg-[#f5efe6] px-1.5 py-0.5 rounded font-bold">start-windows.bat</code> 启动本机服务后点击此按钮，或者将下方导出的 <code class="bg-[#f5efe6] px-1.5 py-0.5 rounded">latest_sprite.png</code> 放入 <code class="bg-[#f5efe6] px-1.5 py-0.5 rounded">saved_sprites/</code> 文件夹并双击 <code class="bg-[#f5efe6] px-1.5 py-0.5 rounded font-bold">launch-pet.bat</code>！</li>
-          </ol>
-          <p class="text-[#9c4d36] font-medium">💡 你也可以点击上方「🖥️ Windows 桌面模拟沙盒」标签页，直接在网页内体验拖拽与桌宠巡游效果。</p>
-        `;
-        petModal.classList.remove('hidden');
       });
 
       document.getElementById('btnCloseModal').addEventListener('click', () => petModal.classList.add('hidden'));
