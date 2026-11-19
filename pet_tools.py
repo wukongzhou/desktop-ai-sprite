@@ -3,11 +3,13 @@
 纯逻辑 + 少量 Windows API（ctypes），不依赖 tkinter，网站端也能 import。
 - 吃 = 把文件移进回收站（可恢复），不是彻底删除；大文件吃之前要主人点头。
 - 修 = 图片重新编码 / zip 抢救 / 文本转码；修不好就认栽，不硬撑。
-- 回收站监听：读每个盘 $Recycle.Bin 里的 $I 文件（原路径 + 大小 + 删除时间）。
+- 回收站监听：Windows 读每个盘 $Recycle.Bin 里的 $I 文件（原路径 + 大小 + 删除时间）；
+  macOS 盯 ~/.Trash 废纸篓（文件名 + 大小 + 删除时间，同一文件删两次也认得出来）。
 """
 from __future__ import annotations
 
 import os
+import shutil
 import struct
 import sys
 import zipfile
@@ -141,9 +143,41 @@ def repair_file(path: str | Path, out_dir: str | Path | None = None) -> dict:
 
 
 # ---------------------------------------------------------------- 吃文件
+def send_to_trash_mac(path: str | Path) -> bool:
+    """macOS：把文件移进 ~/.Trash（Finder 废纸篓，可恢复）。重名自动加序号。
+    文件本来就在废纸篓里时直接算成功。失败返回 False，绝不彻底删除。"""
+    src = Path(path)
+    if not src.exists():
+        return False
+    trash = Path.home() / ".Trash"
+    try:
+        trash.mkdir(parents=True, exist_ok=True)
+    except Exception:
+        return False
+    try:
+        if src.resolve().parent == trash.resolve():
+            return True  # 已经在废纸篓里了
+    except Exception:
+        pass
+    dest = trash / src.name
+    if dest.exists():
+        stem, suffix = dest.stem, dest.suffix
+        i = 1
+        while (trash / f"{stem} {i}{suffix}").exists():
+            i += 1
+        dest = trash / f"{stem} {i}{suffix}"
+    try:
+        shutil.move(str(src), str(dest))
+    except Exception:
+        return False
+    return True
+
+
 def send_to_recycle_bin(path: str | Path) -> bool:
-    """把文件移进回收站（SHFileOperation + FOF_ALLOWUNDO，可恢复）。
-    非 Windows 或失败返回 False，绝不改成彻底删除。"""
+    """把文件移进回收站（Windows 用 SHFileOperation，macOS 移进 ~/.Trash，均可恢复）。
+    其他平台或失败返回 False，绝不改成彻底删除。"""
+    if sys.platform == "darwin":
+        return send_to_trash_mac(path)
     if not sys.platform.startswith("win"):
         return False
     try:
@@ -189,9 +223,65 @@ def _parse_recycle_info(data: bytes) -> dict | None:
     return {"path": path, "name": name, "size": size}
 
 
+def _dir_size(path: Path, cap_files: int = 1000) -> int:
+    """粗略算文件夹总大小（只数前 cap_files 个文件，防大文件夹卡住轮询）。"""
+    total = 0
+    count = 0
+    try:
+        for p in path.rglob("*"):
+            if count >= cap_files:
+                break
+            try:
+                if p.is_file():
+                    total += p.stat().st_size
+                    count += 1
+            except Exception:
+                continue
+    except Exception:
+        pass
+    return total
+
+
+def find_mac_trash_items(trash_dir: str | Path | None = None) -> list[dict]:
+    """列出 macOS 废纸篓（~/.Trash）里的东西。
+    每项：{"path", "name", "size", "info_path", "mtime"}，按删除时间升序。
+    info_path 用“路径|mtime”做唯一键，同一文件删两次也会被认成新的。
+    trash_dir 仅供测试时传入，正常用默认 ~/.Trash。"""
+    base = Path(trash_dir) if trash_dir is not None else Path.home() / ".Trash"
+    items: list[dict] = []
+    if not base.exists():
+        return []
+    try:
+        entries = list(base.iterdir())
+    except Exception:
+        return []
+    for entry in entries:
+        name = entry.name
+        if name.startswith("."):
+            continue  # 跳过 .DS_Store 等隐藏文件
+        try:
+            st = entry.stat()
+        except Exception:
+            continue
+        size = st.st_size if entry.is_file() else _dir_size(entry)
+        mtime = st.st_mtime
+        items.append({
+            "path": str(entry),
+            "name": name,
+            "size": size,
+            "info_path": f"{entry}|{mtime}",
+            "mtime": mtime,
+        })
+    items.sort(key=lambda it: it["mtime"])
+    return items
+
+
 def find_recycle_bin_items() -> list[dict]:
-    """列出回收站里的东西（系统盘）。非 Windows 返回空列表。
+    """列出回收站/废纸篓里的东西。Windows 读 $Recycle.Bin，macOS 读 ~/.Trash，
+    其他平台返回空列表。
     每项：{"path", "name", "size", "info_path", "mtime"}，按删除时间升序。"""
+    if sys.platform == "darwin":
+        return find_mac_trash_items()
     if not sys.platform.startswith("win"):
         return []
     drive = os.environ.get("SystemDrive", "C:")

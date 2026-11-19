@@ -2,7 +2,7 @@
 REM ============================================================
 REM  在 Windows 上一键打出桌宠 .exe（onedir，见 desktop-pet.spec）
 REM  用法：把本文件和 desktop_pet.py、pet_brain.py、pet_tools.py、
-REM  pet_memory.py、desktop-pet.spec 放在同一个文件夹，双击运行。
+REM  pet_memory.py、pet_ai.py、desktop-pet.spec 放在同一个文件夹，双击运行。
 REM  要求：python.org 的 Python 3.12（安装时勾上 tkinter，默认就有；
 REM  微软商店版 Python 可能没有 tkinter，打出来的 exe 会起不来）。
 REM  产物：dist\DesktopPet\DesktopPet.exe

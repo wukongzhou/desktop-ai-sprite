@@ -7,7 +7,7 @@
 产物：dist\\DesktopPet\\DesktopPet.exe（onedir，见下）
 
 为什么是 onedir（文件夹）而不是 onefile（单个 exe），三个理由：
-1. 启动快：桌宠要开机自启、登录就出现。onefile 每次启动都要先把整个包
+1. 启动快：桌宠窗口打开后快速出现；开机启动由用户在右键菜单中主动选择。onefile 每次启动都要先把整个包
    （Pillow + tkinter，约 20MB）解压到临时目录再运行，登录后要等好几秒；
    onedir 直接运行，没有解压这一步。
 2. 数据文件能持久保存：程序默认把性格档案 pet_profile.json、记忆
@@ -43,9 +43,14 @@ a = Analysis(
     [os.path.join(SPEC_DIR, "desktop_pet.py")],
     pathex=[SPEC_DIR],
     binaries=[],
-    datas=[],
+    datas=[
+        (os.path.join(SPEC_DIR, "pet_pack", "default_sprite.png"), "pet_pack"),
+        (os.path.join(SPEC_DIR, "pet_pack", "setup_shortcuts.ps1"), "pet_pack"),
+        (os.path.join(SPEC_DIR, "精灵.ico"), "."),
+    ],
     hiddenimports=[
         "winsound",  # Windows 标准库，函数内 import；Linux 打包时报找不到是正常的
+        "pet_ai",  # Bundle the desktop chat client
     ],
     hookspath=[],
     hooksconfig={},

@@ -1,63 +1,33 @@
-﻿桌面精灵 {PET_NAME} · 安装手册
-Desktop Sprite {PET_NAME} · Installation Manual
+桌面 AI 精灵 · 安装与使用手册
+Desktop AI Sprite · Installation and User Guide
 ================================================
 
-一、包里有什么 | What's inside
-- sprite.png — 你的精灵图 / Your sprite image
-- animation.webp — AI 全身动作（如果生成过）/ AI motion clip (if generated)
-- desktop_pet.py / pet_brain.py — 桌宠程序 / The desktop pet program
-- pet_profile.json — 精灵的性格档案（名字、性格、怪癖）/ Personality profile
-- 精灵.ico — 精灵的头像图标 / The sprite's icon
-- 启动精灵.bat — 一键启动 / One-click launcher
-- 创建快捷方式.ps1 — 桌面图标与开机启动脚本 / Shortcut & auto-start script
+一、启动 | Start
+1. 把本 ZIP 解压到一个单独文件夹。
+2. Windows 10/11 安装 Python 3.9 或更新版本，并确保 tkinter 可用。
+3. 双击「启动精灵.bat」。首次启动会安装 Pillow；桌面精灵不要求本机 GPU。
+4. 精灵默认不会加入开机启动。右键菜单中可以由你主动开启或关闭。
 
-二、需要什么 | Requirements
-- Windows 10 / 11
-- Python 3.9 或以上（没有会自动打开官网下载）/ Python 3.9+ (the launcher opens the download page if missing)
-- 第一次启动需要联网装 Pillow 图片库 / Internet needed once to install Pillow
+二、AI 对话 | AI chat
+1. 右键精灵，选择「设置 AI 接口」。
+2. 粘贴你自己的 NVIDIA API Key，保留默认模型 z-ai/glm-5.3-flash，点击「测试连接」，通过后保存。
+3. 右键选择「跟它聊聊」，输入消息。没有 Key 或服务暂不可用时，精灵仍可使用本地规则和性格回应。
+4. NVIDIA 的免费试用端点、额度、限速和模型可用性由 NVIDIA 管理，可能随时变化。
 
-三、安装步骤 | Install
-1. 把安装包解压到任意文件夹（单独一个文件夹，别直接放桌面根目录）/ Extract the ZIP to any folder.
-2. 双击「启动精灵.bat」/ Double-click 启动精灵.bat.
-3. 第一次启动会自动：装好 Pillow 和拖放组件、在桌面建一个精灵图标、加入开机启动。/ First launch automatically installs Pillow, creates a desktop icon, and adds the pet to startup.
-4. 精灵出现在桌面右下角，开始自己活动。/ The sprite appears at the bottom-right of your desktop and starts moving on its own.
+隐私提示 | Privacy notice
+- API Key 只写入当前 Windows 用户的 AppData\Roaming\DesktopAISprite\pet_ai_config.json，不进入安装包或 Git 仓库。该本机配置文件为明文，请勿分享。
+- 使用云端对话时，你输入的聊天文字、精灵性格和最多五条已记忆事实会发送给 NVIDIA NIM 生成回复。避免发送密码、支付信息或其他敏感资料。NVIDIA 试用服务的数据处理以其当时的条款和隐私政策为准。
+- 桌面精灵的 AI 对话只生成文字，不会自行操作或删除文件。文件修复、移入回收站需要你从菜单主动选择。
+- 图片生成器的 Cloudflare 图像服务与桌宠的 NVIDIA 对话接口是两项独立配置。
 
-四、怎么玩 | How to play
-- 轻点它：打招呼；3 秒里连点三下：它会躲起来 / Click: say hi. Triple-click in 3 seconds: it hides.
-- 双击：它会说一句心里话 / Double-click: it shares a thought.
-- 拖动：把它拎起来，放下会晕乎乎 / Drag: pick it up, it gets dizzy when dropped.
-- 右键菜单：哄它、睡觉/叫醒、看性格卡、换性格、开关开机自启 / Right-click menu: cheer it up, sleep/wake, view personality, re-roll personality, toggle auto-start.
+三、操作 | Interaction
+- 左键拖动：移动精灵。
+- 双击：听它说一句心里话。
+- 右键：聊天、设置接口、摸摸头、陪它玩、睡觉/叫醒、查看性格与记忆。
+- 拖入文件后，可从菜单选择修复或移进回收站；操作由主人发起。
+- 右键菜单可以主动开启/关闭开机启动；初次启动不会自动添加启动项。
 
-五、开机自启 | Auto-start
-- 第一次启动后，每次开机它都会自己醒来（伸个懒腰）。/ After the first launch, it wakes up on every boot (with a big stretch).
-- 不想要：右键精灵 →「开机自启 开/关」。/ To turn off: right-click the pet → toggle auto-start.
-
-六、换精灵 | Change sprite
-- 重新在网站生成并下载安装包，解压到同一个文件夹覆盖即可。/ Generate a new sprite on the website, download a new pack, extract over the same folder.
-
-七、常见问题 | FAQ
-- 双击没反应：右键「启动精灵.bat」→ 用 Python 打开；或确认已装 Python。/ Nothing happens: right-click the .bat → Open with Python, or check Python is installed.
-- 精灵不见了：它可能睡着在角落，或被别的窗口盖住了；重启一次桌宠。/ Pet missing: it may be sleeping in a corner or behind a window; relaunch it.
-- 卸载：删掉整个文件夹，再把桌面图标和开机启动里的「桌面精灵」快捷方式删掉即可。/ To uninstall: delete the folder, plus the desktop icon and the Startup shortcut.
-- 桌宠不会说话，它用气泡和动作跟你交流。/ The pet doesn't talk; it communicates with bubbles and gestures.
-
-八、喂它吃文件 / 让它修文件 | Feed & Repair
-- 删文件时它会自己发现（监听回收站），小文件直接吃掉，大文件先问你。/ When you delete a file, it notices (watches the Recycle Bin): small files are eaten right away, big ones need your OK.
-- 把文件拖到精灵身上，右键选“吃掉这个文件”或“修修这个文件”。/ Drag a file onto the pet, then right-click → "Eat it" or "Fix it".
-- 也可以右键菜单直接选“喂它吃个文件…”或“让它修个文件…”。/ Or use the right-click menu → "Feed it a file..." / "Fix a file...".
-- 吃 = 移进回收站，可恢复；大文件、吃撑了会先问你。/ Eating = move to Recycle Bin (recoverable); it asks first for big files and refuses when full.
-- 能修的：图片重新编码、zip 抢救、文本转码；修不好它会委屈脸认栽。/ It can fix: image re-encode, ZIP salvage, text re-encode. If it can't, it admits it with a sad face.
-- 拖放需要 tkinterdnd2：第一次启动会自动装（装不上也不影响，右键菜单一样能用）。/ Drag-and-drop needs tkinterdnd2 (auto-installed on first launch; the right-click menu works without it).
-
-九、随机情绪 + 主人互动 | Mood & Play
-- 它会随机换情绪（开心、无聊、委屈、兴奋、犯困、傲娇），每半分钟到一分钟换一个；情绪会改它的行为和说话，性格卡上能看到它现在什么情绪。/ It changes mood every half minute or so (happy, bored, sad, excited, sleepy, tsundere); mood changes its behavior and bubbles, and the profile card shows the current mood.
-- 鼠标一分钟没动，它自己走过来问“主人，你在干嘛呀？”/ If you leave the mouse alone for a minute, it walks over and asks what you're up to.
-- 右键菜单：摸摸头（它超开心）、陪它玩一会儿、问问它在想什么。/ Right-click menu: pat its head, play with it, ask what it's thinking.
-- 戳它的反应看它现在什么情绪：委屈时戳它更委屈，开心时戳它更兴奋。/ How it reacts to pokes depends on its mood: poking it while sad makes it sadder, while happy makes it more excited.
-
-十、学习功能：教它、记事、习惯 | Learning & Memory
-- 右键菜单“教它一句话…”：教它点什么，比如“我喜欢喝咖啡”“我叫亮哥”“我每天 9 点上班”，它就记住了。/ Right-click → "Teach it a sentence...": teach it things like "I like coffee", "Call me Liang", "I start work at 9 every day" — it remembers.
-- 右键菜单“它记得什么？”：列出它记住的事和主人的习惯。/ "What does it remember?": lists everything it learned and your habits.
-- 它自己也会观察：你常喂它什么、常让它修什么、总在几点找它，都攒成习惯。/ It also watches on its own: what you feed it, what you ask it to fix, when you come play — and turns them into habits.
-- 记忆存在 pet_memory.json 里，跟着精灵走；换性格也不丢。/ Memories live in pet_memory.json and travel with the pet; they survive a personality change.
-- 老实话：它是按固定句式听的（我喜欢/我不喜欢/我叫/我每天几点），不是大模型；听不懂的原样记下来。真要自由对话理解，得接本地小模型。/ Honest note: it understands fixed patterns (I like / I don't like / call me / every day at ...), not free conversation. Real free-form understanding needs a local small model.
+四、技术说明 | Technical notes
+- NVIDIA API 使用 OpenAI 兼容的 HTTPS chat-completions 接口；`pet_ai.py` 仅使用 Python 标准库。
+- 默认模型为 NVIDIA API Catalog 当前列出的 `z-ai/glm-5.3-flash`，可在接口设置中更改。
+- 若连接失败，请检查 API Key、当前模型是否仍开放试用、NVIDIA 账户的可用额度及网络连接。

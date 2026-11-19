@@ -1,4 +1,4 @@
-"""desktop_pet.py v3.5.1 — 拟人化桌宠（换性格必换名）。
+"""desktop_pet.py v3.5 — 拟人化桌宠（学习功能 + 砸屏幕对话框）。
 
 在 v2 的透明窗、拖拽、右键菜单、AI 动作循环基础上，接上 pet_brain：
 精灵自己随机动（走、跳、睡、发呆、凑近鼠标、假装忙……），心情值涨跌，
@@ -43,13 +43,26 @@ except Exception:
     pet_memory = None
 
 try:
+    import pet_ai
+except Exception:
+    pet_ai = None
+
+try:
     from tkinterdnd2 import TkinterDnD, DND_FILES
 except Exception:
     TkinterDnD = None
     DND_FILES = None
 
-DEFAULT_SPRITE = ROOT / "saved_sprites" / "latest_sprite.png"
-DEFAULT_PROFILE = ROOT / "pet_profile.json"
+APP_ROOT = Path(sys.executable).resolve().parent if getattr(sys, "frozen", False) else ROOT
+if getattr(sys, "frozen", False):
+    USER_DATA_DIR = Path(os.environ.get("LOCALAPPDATA", Path.home() / "AppData" / "Local")) / "DesktopAISprite"
+    USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
+else:
+    USER_DATA_DIR = ROOT
+_GENERATED_SPRITE = USER_DATA_DIR / "saved_sprites" / "latest_sprite.png"
+_BUNDLED_DEFAULT_SPRITE = Path(getattr(sys, "_MEIPASS", ROOT)) / "pet_pack" / "default_sprite.png"
+DEFAULT_SPRITE = _GENERATED_SPRITE if _GENERATED_SPRITE.exists() else _BUNDLED_DEFAULT_SPRITE
+DEFAULT_PROFILE = USER_DATA_DIR / "pet_profile.json"
 
 # 大脑行为 id -> 渲染分支
 RENDER_STATE = {
@@ -90,7 +103,6 @@ class DesktopSpriteApp:
 
         # ---- 性格档案：有就读，没有（或要求重掷）就掷一个并存下来
         brain = Brain.load(self.profile_path, memory_path=self.memory_path)
-        fresh_profile = brain is None or new_personality
         if brain is None or new_personality:
             profile = roll_personality()
             if name:
@@ -181,6 +193,10 @@ class DesktopSpriteApp:
         self._bubble_scale = 1.0
         self._bubble_text_shown = ""
         self._slam_sounded = False
+        self._chat_busy = False
+        self._chat_result = None
+        self._chat_started = 0.0
+        self._chat_history: list = []
 
         self.bubble_text = f"嗨！我是{self.name} ✨"
         self.bubble_timer = 110
@@ -194,10 +210,6 @@ class DesktopSpriteApp:
         self._bind_events()
         self._build_context_menu()
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
-        self._autostart_done = False
-        if fresh_profile and sys.platform.startswith("win"):
-            # 第一次启动：晚 1.5 秒再注册开机启动，先让精灵露脸
-            self.root.after(1500, self._ensure_autostart_once)
         if pet_tools is not None:
             try:
                 self._recycle_seen = {it["info_path"] for it in pet_tools.find_recycle_bin_items()}
@@ -240,9 +252,12 @@ class DesktopSpriteApp:
         self.menu.add_command(label="🚶 切换桌面自由巡游", command=self.toggle_roam)
         self.menu.add_separator()
         self.menu.add_command(label="💛 哄它一下", command=self._cheer)
+        self.menu.add_command(label="😤 说它两句", command=self._scold)
         self.menu.add_command(label="🤲 摸摸头", command=self._pet_head)
         self.menu.add_command(label="⚽ 陪它玩一会儿", command=self._play_with)
         self.menu.add_command(label="💬 问问它在想什么", command=self._ask_it)
+        self.menu.add_command(label="💬 跟它聊聊…", command=self._chat_via_dialog)
+        self.menu.add_command(label="🔑 设置 AI 接口…", command=self._ai_settings_dialog)
         if pet_memory is not None:
             self.menu.add_command(label="📖 教它一句话…", command=self._teach_via_dialog)
             self.menu.add_command(label="🧠 它记得什么？", command=self._show_memory)
@@ -263,9 +278,14 @@ class DesktopSpriteApp:
 
     def set_state(self, new_state: str) -> None:
         bid = BEHAVIOR_FOR_STATE.get(new_state, "idle_look")
-        self.brain.force(bid)
+        accepted, text = self.brain.try_force(bid)
+        if not accepted:
+            # 它不听话：摆臭脸，状态不动，气泡就是那句“哼！就不去！”
+            self.bubble_text = text
+            self.bubble_timer = 110
+            return
         self.state = new_state
-        self.bubble_text = self.brain.bubble_for(bid)
+        self.bubble_text = text
         self.bubble_timer = 110
 
     def toggle_roam(self) -> None:
@@ -275,6 +295,11 @@ class DesktopSpriteApp:
 
     def _cheer(self) -> None:
         self.bubble_text = self.brain.on_cheer()
+        self.bubble_timer = 110
+
+    def _scold(self) -> None:
+        _bid, text = self.brain.on_scold()
+        self.bubble_text = text
         self.bubble_timer = 110
 
     # ---------------------------------------------------------- 主人互动
@@ -334,7 +359,10 @@ class DesktopSpriteApp:
         self.bubble_timer = 110
 
     def _shortcut_script(self) -> Path:
-        return ROOT / "创建快捷方式.ps1"
+        root_script = ROOT / "创建快捷方式.ps1"
+        if root_script.exists():
+            return root_script
+        return ROOT / "pet_pack" / "setup_shortcuts.ps1"
 
     def _run_shortcut_script(self, action: str) -> bool:
         ps1 = self._shortcut_script()
@@ -343,7 +371,7 @@ class DesktopSpriteApp:
         try:
             r = subprocess.run(
                 ["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass",
-                 "-File", str(ps1), "-Action", action, "-Dir", str(ROOT)],
+                 "-File", str(ps1), "-Action", action, "-Dir", str(APP_ROOT)],
                 capture_output=True, timeout=60)
             return r.returncode == 0
         except Exception:
@@ -353,13 +381,6 @@ class DesktopSpriteApp:
         appdata = os.environ.get("APPDATA", "")
         return (Path(appdata) / "Microsoft" / "Windows" / "Start Menu"
                 / "Programs" / "Startup" / "桌面精灵.lnk")
-
-    def _ensure_autostart_once(self) -> None:
-        if self._autostart_done or not sys.platform.startswith("win"):
-            return
-        self._autostart_done = True
-        if self._run_shortcut_script("install"):
-            print("已加入开机启动。")
 
     def _toggle_autostart(self) -> None:
         if not sys.platform.startswith("win"):
@@ -583,6 +604,144 @@ class DesktopSpriteApp:
             self.brain.save(self.profile_path)
         except Exception:
             pass
+
+    # ---------------------------------------------------------- AI 大脑（英伟达 NIM）
+    def _chat_via_dialog(self) -> None:
+        """跟它聊聊：输一句话发给 AI，气泡回。没 Key 时先提示去填 Key。"""
+        if pet_ai is None:
+            self.bubble_text = "缺少 pet_ai.py，聊不了天。"
+            self.bubble_timer = 120
+            return
+        if self._chat_busy:
+            self.bubble_text = "等一下，我还在想上一句呢～"
+            self.bubble_timer = 120
+            return
+        if not pet_ai.is_configured():
+            self.bubble_text = "想跟我聊天？先去右键菜单“🔑 设置 AI 接口”里把 Key 粘进来～"
+            self.bubble_timer = 220
+            return
+        text = simpledialog.askstring("跟它聊聊", "想跟我说什么？（它只打字回，不出声）")
+        if text:
+            self._chat_text(text.strip())
+
+    def _chat_text(self, text: str) -> None:
+        """把一句话发给 AI（后台线程，不卡画面），回来了气泡显示。"""
+        if not text:
+            return
+        self._chat_busy = True
+        self._chat_result = None
+        self._chat_started = time.monotonic()
+        self.bubble_text = "（想了想）嗯……让我想想……"
+        self.bubble_timer = 200
+
+        def _work() -> None:
+            try:
+                ok, reply = pet_ai.chat(self.brain, text, history=self._chat_history)
+                self._chat_result = (ok, reply, text)
+            except Exception as e:
+                self._chat_result = (False, f"出错了：{e}", text)
+
+        threading.Thread(target=_work, daemon=True).start()
+        self.root.after(120, self._check_chat_done)
+
+    def _check_chat_done(self) -> None:
+        if self._chat_result is None:
+            if self._chat_busy and time.monotonic() - self._chat_started < 30:
+                self.root.after(120, self._check_chat_done)
+            elif self._chat_busy:
+                self._chat_busy = False
+                self.bubble_text = "想得有点久，先算了，等会儿再聊～"
+                self.bubble_timer = 140
+            return
+        ok, reply, text = self._chat_result
+        self._chat_busy = False
+        if ok:
+            self._chat_history.append({"role": "user", "content": text})
+            self._chat_history.append({"role": "assistant", "content": reply})
+            self._chat_history = self._chat_history[-6:]
+            self.brain.note_event("chat")
+            self.brain.happy = max(0.0, min(100.0, self.brain.happy + 3))
+            self.bubble_text = reply
+        else:
+            # 没网 / Key 不对 / 接口报错：降级成规则版，不崩
+            self.bubble_text = reply + "（先按老办法回你一句：）" + self.brain.on_ask()
+        self.bubble_timer = 220
+        try:
+            self.brain.save(self.profile_path)
+        except Exception:
+            pass
+
+    def _ai_settings_dialog(self) -> None:
+        """设置 AI 接口：粘贴英伟达 Key、选模型、点“测试连接”验证，通过再保存。"""
+        if pet_ai is None:
+            self.bubble_text = "缺少 pet_ai.py，设不了 AI 接口。"
+            self.bubble_timer = 120
+            return
+        cfg = pet_ai.load_config()
+        win = tk.Toplevel(self.root)
+        win.title("设置 AI 接口 · 英伟达 NIM")
+        win.resizable(False, False)
+        win.attributes("-topmost", True)
+        frm = tk.Frame(win, padx=16, pady=14)
+        frm.pack(fill="both", expand=True)
+        tk.Label(frm, text="英伟达 API Key（nvapi- 开头）：",
+                 font=("Microsoft YaHei", 10)).pack(anchor="w")
+        key_var = tk.StringVar(value=cfg.get("api_key", ""))
+        key_entry = tk.Entry(frm, textvariable=key_var, width=52, show="*",
+                             font=("Consolas", 10))
+        key_entry.pack(fill="x", pady=(4, 2))
+        tk.Label(frm, text="Key 保存在本机用户配置目录，不会打包进安装包或仓库。",
+                 font=("Microsoft YaHei", 9), fg="#666").pack(anchor="w")
+        tk.Label(frm, text="聊天文字、精灵性格和少量记忆会发送给 NVIDIA 处理；请勿输入密码等敏感内容。",
+                 font=("Microsoft YaHei", 9), fg="#8a4b08", wraplength=460,
+                 justify="left").pack(anchor="w", pady=(2, 0))
+        tk.Label(frm, text="模型（默认就行，不通再换）：",
+                 font=("Microsoft YaHei", 10)).pack(anchor="w", pady=(10, 0))
+        model_var = tk.StringVar(value=cfg.get("model", pet_ai.DEFAULT_MODEL))
+        model_entry = tk.Entry(frm, textvariable=model_var, width=52,
+                               font=("Consolas", 10))
+        model_entry.pack(fill="x", pady=(4, 2))
+        tk.Label(frm, text="备选：nvidia/nemotron-3.5-bolt-e4b",
+                 font=("Microsoft YaHei", 9), fg="#666").pack(anchor="w")
+        status = tk.Label(frm, text="", font=("Microsoft YaHei", 10), fg="#333",
+                          wraplength=460, justify="left")
+        status.pack(anchor="w", pady=(10, 4))
+        btns = tk.Frame(frm)
+        btns.pack(fill="x", pady=(6, 0))
+
+        def _do_test() -> None:
+            test_cfg = {"api_key": key_var.get().strip(),
+                        "model": model_var.get().strip() or pet_ai.DEFAULT_MODEL,
+                        "base_url": pet_ai.DEFAULT_BASE_URL}
+            status.config(text="正在测试连接，请稍等……", fg="#333")
+            win.update_idletasks()
+
+            def _work() -> None:
+                ok, msg = pet_ai.test_connection(test_cfg)
+                win.after(0, lambda: status.config(
+                    text=("✅ " if ok else "❌ ") + msg,
+                    fg="#1a7f37" if ok else "#c0392b"))
+
+            threading.Thread(target=_work, daemon=True).start()
+
+        def _do_save() -> None:
+            key = key_var.get().strip()
+            if not key:
+                status.config(text="❌ Key 还是空的，粘一个再保存。", fg="#c0392b")
+                return
+            if not key.startswith("nvapi-"):
+                status.config(text="⚠ Key 看起来不像英伟达的（一般 nvapi- 开头），先保存了，不通再检查。", fg="#b26a00")
+            pet_ai.save_config(key, model_var.get().strip() or pet_ai.DEFAULT_MODEL)
+            status.config(text="✅ 已保存到本机用户配置目录，可以右键“跟它聊聊”了！", fg="#1a7f37")
+            win.after(1200, win.destroy)
+
+        tk.Button(btns, text="🔍 测试连接", command=_do_test,
+                  font=("Microsoft YaHei", 10)).pack(side="left", padx=(0, 8))
+        tk.Button(btns, text="💾 保存", command=_do_save,
+                  font=("Microsoft YaHei", 10, "bold")).pack(side="left", padx=(0, 8))
+        tk.Button(btns, text="取消", command=win.destroy,
+                  font=("Microsoft YaHei", 10)).pack(side="left")
+        key_entry.focus_set()
 
     def _show_profile(self) -> None:
         messagebox.showinfo(

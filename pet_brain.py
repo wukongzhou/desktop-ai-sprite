@@ -129,6 +129,8 @@ LINES = {
     "thought": ["我在想，云是什么味道的。", "如果文件有味道，.jpg 应该是草莓味。", "主人今天心情怎么样呢？", "等会儿要不要去屏幕那头看看。"],
     "petted": ["（舒服得眯起眼睛）", "嘿嘿，再摸一下嘛～", "（蹭蹭你的手）"],
     "ask_owner": ["主人，你今天心情怎么样？", "等会儿带我去屏幕那头看看好不好？", "你最喜欢吃什么呀？", "今天有什么好玩的事吗？"],
+    "refuse": ["哼！就不去！", "不要！我现在不想动。", "（抱臂扭头）就不！"],
+    "scolded": ["（委屈）我知道错了……", "哼！你凶我！", "（耷拉耳朵）下次不敢了……"],
 }
 
 # ---------------------------------------------------------------- 情绪文案
@@ -186,6 +188,26 @@ EMOTION_LABELS = {"happy": "开心", "bored": "无聊", "sad": "委屈",
                   "excited": "兴奋", "sleepy": "犯困", "tsundere": "傲娇"}
 
 
+# ---------------------------------------------------------------- 按时段学的偏好表
+# pref[时段][行为]：夸了 +0.3、骂了 -0.3，夹在 -2..2；每次大脑选完行为后
+# 当前时段的偏好整体 x0.995 慢慢淡忘。权重里以 exp(偏好) 乘进去，
+# 所以养几天就能看出差别：总夸它晚上跳舞，它晚上就爱跳舞。
+TIME_SLOTS = ["凌晨", "上午", "下午", "晚上"]
+PREF_STEP = 0.3
+PREF_MIN, PREF_MAX = -2.0, 2.0
+PREF_DECAY = 0.995
+
+
+def slot_for_hour(hour: int) -> str:
+    if hour < 6:
+        return "凌晨"
+    if hour < 12:
+        return "上午"
+    if hour < 18:
+        return "下午"
+    return "晚上"
+
+
 # ---------------------------------------------------------------- 行为表
 # weight：基础权重；duration：持续秒数范围；mood：结束时的心情变化。
 BEHAVIORS = {
@@ -237,6 +259,10 @@ class Brain:
                       "meals": 0, "repairs_ok": 0, "repairs_fail": 0,
                       "head_pats": 0,
                       "lessons": 0}
+        # 按时段学的动作偏好：{时段: {行为: 分数}}，全 0 起步，越用越像养熟的
+        self.prefs: dict = {slot: {} for slot in TIME_SLOTS}
+        self.stats["refusals"] = 0
+        self.stats["scolds"] = 0
         # 行为状态
         self.current = "idle_look"
         self.behavior_t = 0.0
@@ -295,6 +321,10 @@ class Brain:
                 w *= 5
             elif bid == "sleep":
                 w *= 0
+        # 学到的偏好：这个时段越爱干的事，权重越高（exp，0 分时 x1 不变）
+        pref = self.prefs.get(self.current_slot(), {}).get(bid, 0.0)
+        if pref:
+            w *= math.exp(pref)
         if bid == "ai_motion" and not self.has_ai_motion:
             return 0.0
         # 情绪修正
@@ -331,6 +361,12 @@ class Brain:
         if sum(weights) <= 0:
             return "idle_look"
         pick = self.rng.choices(ids, weights=weights, k=1)[0]
+        # 慢慢淡忘：当前时段的偏好整体 x0.995，太久不提的事就淡了
+        slot_prefs = self.prefs[self.current_slot()]
+        for k in list(slot_prefs):
+            slot_prefs[k] *= PREF_DECAY
+            if abs(slot_prefs[k]) < 0.01:
+                del slot_prefs[k]
         # 睡醒之后先伸懒腰，不直接干别的
         if self._last_sleep and pick != "sleep":
             self._last_sleep = False
@@ -375,6 +411,59 @@ class Brain:
         """外部强制切行为（右键菜单手动点）。"""
         if bid in BEHAVIORS:
             self._start(bid)
+
+    # -------------------------------------------------- 会学、敢不听话
+    def current_slot(self, hour: int | None = None) -> str:
+        """现在是哪个时段（传 hour 可指定，测试用）。"""
+        if hour is None:
+            hour = time.localtime().tm_hour
+        return slot_for_hour(hour)
+
+    def reward(self, delta: float, bid: str | None = None,
+               hour: int | None = None) -> float:
+        """给某个行为在当前时段的偏好加/减分，返回加完的分。
+        夸 +0.3、骂 -0.3（由调用方按 ±1 换算后传 delta），夹在 -2..2。"""
+        bid = bid or self.current
+        slot = self.current_slot(hour)
+        prefs = self.prefs.setdefault(slot, {})
+        v = max(PREF_MIN, min(PREF_MAX, prefs.get(bid, 0.0) + delta))
+        if abs(v) < 0.01:
+            prefs.pop(bid, None)
+        else:
+            prefs[bid] = round(v, 3)
+        return prefs.get(bid, 0.0)
+
+    def refuse_chance(self) -> float:
+        """这次指令被拒绝的概率：脾气大、心情差时最高 50%。
+        公式照 Claude 那套：脾气 x0.35x(1.2-心情)，心情 = 开心/100。"""
+        temper = self.traits.get("tsundere", 0.5)
+        mood = self.happy / 100.0
+        return max(0.0, min(0.5, temper * 0.35 * (1.2 - mood)))
+
+    def try_force(self, bid: str) -> tuple[bool, str]:
+        """右键菜单点指令：先掷拒绝，拒绝了就摆臭脸、不干活；
+        通过了才切行为。返回（照办与否，气泡文案）。"""
+        if bid not in BEHAVIORS:
+            return False, "（歪头）这个我不会呀。"
+        if self.rng.random() < self.refuse_chance():
+            self.stats["refusals"] += 1
+            self._start("grumpy")
+            return False, self.rng.choice(LINES["refuse"])
+        self._start(bid)
+        return True, self.bubble_for(bid)
+
+    def on_scold(self) -> tuple[str, str]:
+        """说它两句：正在干的事以后少干（偏好 -0.3），开心 -15。
+        脾气大就闹脾气，否则委屈脸。"""
+        self.stats["scolds"] += 1
+        self.reward(-PREF_STEP)
+        self.happy = _clamp(self.happy - 15)
+        self.note_event("scold")
+        if self.traits.get("tsundere", 0) > 0.6:
+            self._start("grumpy")
+            return "grumpy", self.rng.choice(LINES["scolded"])
+        self._start("shy_hide")
+        return "shy_hide", self.rng.choice(LINES["scolded"])
 
     def _apply_mood(self, delta: dict) -> None:
         for k, v in delta.items():
@@ -442,8 +531,9 @@ class Brain:
         return "idle_look", self.rng.choice(LINES["dazed"])
 
     def on_cheer(self) -> str:
-        """哄它一下。"""
+        """哄它一下：开心 +20，而且正在干的事以后更爱干（偏好 +0.3）。"""
         self.note_event("cheer")
+        self.reward(PREF_STEP)
         self.happy = _clamp(self.happy + 20)
         self._start("excited")
         return self.bubble_for("cheered")
@@ -512,6 +602,9 @@ class Brain:
     def status_line(self) -> str:
         learned = (f" · 记了 {len(self.memory.facts)} 件事"
                    if self.memory is not None and self.memory.facts else "")
+        n_pref = sum(len(v) for v in self.prefs.values())
+        if n_pref:
+            learned += f" · 学会了 {n_pref} 条偏好"
         return (f"现在{EMOTION_LABELS[self.emotion]} · "
                 f"饱腹 {self.fullness:.0f}% · 吃过 {self.stats['meals']} 个文件 · "
                 f"修好 {self.stats['repairs_ok']} 个{learned}")
@@ -535,9 +628,10 @@ class Brain:
         return self.rng.choice(EMOTION_LINES[self.emotion])
 
     def on_pet(self) -> tuple[str, str]:
-        """摸摸头：开心 +10。"""
+        """摸摸头：开心 +10，正在干的事也悄悄加分（偏好 +0.1）。"""
         self.stats["head_pats"] += 1
         self.note_event("pat")
+        self.reward(0.1)
         self.happy = _clamp(self.happy + 10)
         self._start("excited")
         return "excited", self.rng.choice(LINES["petted"])
@@ -609,6 +703,7 @@ class Brain:
                 "curiosity": round(self.curiosity, 1),
             },
             "stats": self.stats,
+            "prefs": {slot: dict(v) for slot, v in self.prefs.items()},
         }
 
     @classmethod
@@ -620,6 +715,9 @@ class Brain:
             if hasattr(brain, k):
                 setattr(brain, k, float(v))
         brain.stats.update(data.get("stats", {}))
+        saved = data.get("prefs", {})
+        if saved:
+            brain.prefs = {slot: dict(saved.get(slot, {})) for slot in TIME_SLOTS}
         return brain
 
     def save(self, path: str | Path) -> None:
