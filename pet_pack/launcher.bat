@@ -21,6 +21,22 @@ if not defined PYCMD (
   )
 )
 if not defined PYCMD (
+  for /d %%P in ("%LOCALAPPDATA%\Programs\Python\Python*") do (
+    if exist "%%~P\python.exe" (
+      "%%~P\python.exe" --version >nul 2>nul
+      if not errorlevel 1 set "PYCMD="%%~P\python.exe""
+    )
+  )
+)
+if not defined PYCMD (
+  for /d %%P in ("%ProgramFiles%\Python*") do (
+    if exist "%%~P\python.exe" (
+      "%%~P\python.exe" --version >nul 2>nul
+      if not errorlevel 1 set "PYCMD="%%~P\python.exe""
+    )
+  )
+)
+if not defined PYCMD (
   echo [错误] 未检测到可用的 Python 3。
   echo [Error] Python 3 was not found. Install Python 3.9+:
   echo https://www.python.org/downloads/
