@@ -806,7 +806,10 @@ async def pet_pack(sprite_data: str = Form(...), animation_file: str = Form(""),
                 zf.write(code_path, code_file)
         zf.writestr("pet_profile.json", json.dumps(profile, ensure_ascii=False, indent=2))
         zf.writestr("精灵.ico", ico_buf.getvalue())
-        zf.writestr("启动精灵.bat", (PET_PACK_DIR / "launcher.bat").read_text(encoding="utf-8"))
+        launcher_text = (PET_PACK_DIR / "launcher.bat").read_text(encoding="utf-8")
+        # ZIP is created on Linux, but Windows CMD expects CRLF in batch files.
+        launcher_text = launcher_text.replace("\r\n", "\n").replace("\n", "\r\n")
+        zf.writestr("启动精灵.bat", launcher_text)
         zf.writestr("创建快捷方式.ps1", (PET_PACK_DIR / "setup_shortcuts.ps1").read_text(encoding="utf-8"))
         zf.writestr("安装手册.txt", manual)
     buf.seek(0)
