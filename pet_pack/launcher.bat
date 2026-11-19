@@ -24,8 +24,15 @@ if not defined PY_EXE (
     )
   )
 )
-if not defined PY_EXE for /d %%P in ("%LOCALAPPDATA%\Programs\Python\Python*") do if not defined PY_EXE if exist "%%~P\python.exe" set "PY_EXE=%%~P\python.exe"
-if not defined PY_EXE for /d %%P in ("%ProgramFiles%\Python*") do if not defined PY_EXE if exist "%%~P\python.exe" set "PY_EXE=%%~P\python.exe"
+if not defined PY_EXE if exist "%LOCALAPPDATA%\Programs\Python\Python314\python.exe" set "PY_EXE=%LOCALAPPDATA%\Programs\Python\Python314\python.exe"
+if not defined PY_EXE if exist "%LOCALAPPDATA%\Programs\Python\Python313\python.exe" set "PY_EXE=%LOCALAPPDATA%\Programs\Python\Python313\python.exe"
+if not defined PY_EXE if exist "%LOCALAPPDATA%\Programs\Python\Python312\python.exe" set "PY_EXE=%LOCALAPPDATA%\Programs\Python\Python312\python.exe"
+if not defined PY_EXE if exist "%LOCALAPPDATA%\Programs\Python\Python311\python.exe" set "PY_EXE=%LOCALAPPDATA%\Programs\Python\Python311\python.exe"
+if not defined PY_EXE if exist "%LOCALAPPDATA%\Programs\Python\Python310\python.exe" set "PY_EXE=%LOCALAPPDATA%\Programs\Python\Python310\python.exe"
+if not defined PY_EXE if exist "%LOCALAPPDATA%\Programs\Python\Python39\python.exe" set "PY_EXE=%LOCALAPPDATA%\Programs\Python\Python39\python.exe"
+if not defined PY_EXE if exist "%ProgramFiles%\Python314\python.exe" set "PY_EXE=%ProgramFiles%\Python314\python.exe"
+if not defined PY_EXE if exist "%ProgramFiles%\Python313\python.exe" set "PY_EXE=%ProgramFiles%\Python313\python.exe"
+if not defined PY_EXE if exist "%ProgramFiles%\Python312\python.exe" set "PY_EXE=%ProgramFiles%\Python312\python.exe"
 if not defined PY_EXE (
   echo [错误] 找到不了 Python 3。安装 Python 3.9 或更新版本后重试。
   echo [Error] Could not find Python 3. Install Python 3.9 or newer.
