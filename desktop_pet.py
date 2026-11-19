@@ -59,9 +59,17 @@ if getattr(sys, "frozen", False):
     USER_DATA_DIR.mkdir(parents=True, exist_ok=True)
 else:
     USER_DATA_DIR = ROOT
+_PACKAGED_SPRITE = APP_ROOT / "sprite.png"
 _GENERATED_SPRITE = USER_DATA_DIR / "saved_sprites" / "latest_sprite.png"
 _BUNDLED_DEFAULT_SPRITE = Path(getattr(sys, "_MEIPASS", ROOT)) / "pet_pack" / "default_sprite.png"
-DEFAULT_SPRITE = _GENERATED_SPRITE if _GENERATED_SPRITE.exists() else _BUNDLED_DEFAULT_SPRITE
+# Prefer the character shipped beside this launcher. This prevents an older
+# AppData sprite from silently replacing the character in a newly downloaded pack.
+if _PACKAGED_SPRITE.is_file():
+    DEFAULT_SPRITE = _PACKAGED_SPRITE
+elif _GENERATED_SPRITE.is_file():
+    DEFAULT_SPRITE = _GENERATED_SPRITE
+else:
+    DEFAULT_SPRITE = _BUNDLED_DEFAULT_SPRITE
 DEFAULT_PROFILE = USER_DATA_DIR / "pet_profile.json"
 
 # 大脑行为 id -> 渲染分支

@@ -775,6 +775,12 @@ async def pet_pack(sprite_data: str = Form(...), animation_file: str = Form(""),
         img = Image.open(io.BytesIO(raw)).convert("RGBA")
     except Exception:
         raise HTTPException(400, "精灵图片打不开。")
+    # Normalize every accepted upload (WebP/JPEG/PNG) to real PNG bytes.
+    # The desktop launcher relies on this file being a valid PNG, not only a .png name.
+    sprite_png_buffer = io.BytesIO()
+    img.save(sprite_png_buffer, format="PNG")
+    sprite_png = sprite_png_buffer.getvalue()
+
     profile = _roll_personality() if _roll_personality else _fallback_personality()
     if pet_name.strip():
         profile["name"] = pet_name.strip()[:20]
@@ -789,7 +795,7 @@ async def pet_pack(sprite_data: str = Form(...), animation_file: str = Form(""),
     manual = (PET_PACK_DIR / "manual.txt").read_text(encoding="utf-8").replace("{PET_NAME}", name)
     buf = io.BytesIO()
     with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        zf.writestr("sprite.png", raw)
+        zf.writestr("sprite.png", sprite_png)
         if animation_file:
             anim_path = SPRITES_DIR / Path(animation_file).name
             if anim_path.exists() and anim_path.is_file():
